@@ -1,0 +1,4 @@
+1. UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb3 in position 92: invalid start byte:
+    W moim przypadku oznaczało że złe credentiale do bazy danych
+
+2. Pamiętać o tym przed pierwszą migracją 'AUTH_USER_MODEL = "user.CentralUser"' -> Ustawienia

@@ -2,13 +2,15 @@ from rest_framework import serializers
 from .models import CentralUser
 
 
-class RegisterUserSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    password = serializers.CharField()
+class RegisterUserSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = CentralUser
+        fields = ['email', 'password', 'first_name', 'last_name', 'phone_number']
 
     def validate_password(self, value):
-        if len(value) <= 8:
-            raise serializers.ValidationError("Password is to short")
+        if len(value) < 8:
+            raise serializers.ValidationError("Password is too short")
         return value
     
     def validate_email(self, value):

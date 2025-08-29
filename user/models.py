@@ -1,5 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+import uuid
+
+from django.utils import timezone
+import hmac
+from .utils import hmac_code, default_expires
 
 
 class CentralUserManager(BaseUserManager):
@@ -26,6 +31,8 @@ class CentralUser(AbstractBaseUser):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
+    is_user_activated = models.BooleanField(default=False)
+
     objects = CentralUserManager()
 
     USERNAME_FIELD = 'email'
@@ -38,3 +45,36 @@ class CentralUser(AbstractBaseUser):
 
     def has_module_perms(self, app_label):
         return self.is_superuser
+    
+
+class TwoFactory(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
+    purpose = models.CharField(max_length=255, default="register") 
+    code_hmac = models.CharField(max_length=64)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    attempts = models.IntegerField(default=0)
+    attempts_limit = models.IntegerField(default=5)
+
+    @property
+    def is_expired(self): return timezone.now() >= self.expires_at
+    @property
+    def is_used(self): return self.used_at is not None
+
+    def verify(self, code_input: str):
+        if self.is_used or self.is_expired or self.attempts >= self.attempts_limit:
+            return False
+        
+        self.attempts += 1
+        ok = hmac.compare_digest(hmac_code(code_input), self.code_hmac)
+        
+        self.save(update_fields=["attempts"])
+        if ok:
+            self.used_at = timezone.now()
+            self.save(update_fields=["used_at"])
+            
+        return ok

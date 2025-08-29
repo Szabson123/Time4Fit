@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from .serializers import RegisterUserSerializer, LoginUserSerializer
+from .serializers import RegisterUserSerializer, LoginUserSerializer, ResetPasswordUserSerializer
 from .utils import gen_code, hmac_code, default_expires
 from .models import CentralUser, TwoFactory
 
@@ -59,7 +59,7 @@ class UserLoginView(GenericAPIView):
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
-        
+
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -76,11 +76,44 @@ class UserLoginView(GenericAPIView):
                 code_hmac=hmac_code(code_plain),
                 expires_at=default_expires(sec_ttl)
             )
-
+            
         # Send Email
 
         return Response({
             "challenge_id": str(challenge.id),
             "time_valid": minutes_valid
         }, status=status.HTTP_201_CREATED)
-    
+
+
+class ResetPasswordView(GenericAPIView):
+    serializer_class = ResetPasswordUserSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.error, status=status.HTTP_400_BAD_REQUEST)
+        
+        data = serializer.valid_data
+
+        email = data["email"]
+
+        try:
+            user = CentralUser.objects.get(email=email)
+        except CentralUser.DoesNotExist:
+            return Response({"detail": "Jeśli ten e-mail istnieje, wyślemy kod."}, status=200)
+        
+        code_plain = gen_code(6)
+
+        sec_ttl = 300
+
+        TwoFactory.objects.create(
+            user=user,
+            purpose="reset_password",
+            code_hmac=hmac_code(code_plain),
+            expires_at=default_expires(sec_ttl)
+        )
+
+        # Send Email
+
+        return Response({"detail": "Jeśli ten e-mail istnieje, wyślemy kod."}, status=200)

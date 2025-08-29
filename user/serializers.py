@@ -13,7 +13,7 @@ class RegisterUserSerializer(serializers.Serializer):
     
     def validate_email(self, value):
         if CentralUser.objects.filter(email=value).exists():
-            raise serializers.ValidationError("User does not exist")
+            raise serializers.ValidationError("User exists")
         
         return value
     
@@ -36,3 +36,7 @@ class LoginUserSerializer(serializers.Serializer):
 
         data["user"] = user
         return data
+    
+
+class ResetPasswordUserSerializer(serializers.Serializer):
+    email = serializers.EmailField()

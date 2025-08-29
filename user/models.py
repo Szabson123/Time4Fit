@@ -76,5 +76,6 @@ class TwoFactory(models.Model):
         if ok:
             self.used_at = timezone.now()
             self.save(update_fields=["used_at"])
-            
+
         return ok
+

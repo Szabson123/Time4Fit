@@ -1,6 +1,8 @@
 from django.shortcuts import render
 from django.db import transaction
 
+import uuid
+
 from rest_framework.generics import GenericAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -40,15 +42,16 @@ class UserRegisterView(GenericAPIView):
                 user = user,
                 purpose = "register",
                 code_hmac = hmac_code(code_plain),
-
                 expires_at = default_expires(ttl_sec)
             )
+
             message = f"Witaj w Time4Fit twój kod do rejestracji to {code_plain}"
             send_welcome_email.delay(email, message)
 
         return Response({
             "challenge_id": str(challenge.id),
-            "time_valid": minutes_valid
+            "time_valid": minutes_valid,
+            "purpose": "resgister",
         }, status=status.HTTP_201_CREATED)
 
 
@@ -75,11 +78,13 @@ class UserLoginView(GenericAPIView):
                 expires_at=default_expires(sec_ttl)
             )
             
-        # Send Email
+        message = f"Witaj w Time4Fit twój kod do logowania to {code_plain}"
+        send_welcome_email.delay(email, message)
 
         return Response({
             "challenge_id": str(challenge.id),
-            "time_valid": minutes_valid
+            "time_valid": minutes_valid,
+            "purpose": "login"
         }, status=status.HTTP_201_CREATED)
 
 
@@ -90,28 +95,36 @@ class ResetPasswordView(GenericAPIView):
         serializer = self.get_serializer(data=request.data)
 
         if not serializer.is_valid():
-            return Response(serializer.error, status=status.HTTP_400_BAD_REQUEST)
-        
-        data = serializer.valid_data
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        data = serializer.validated_data
 
         email = data["email"]
-
-        try:
-            user = CentralUser.objects.get(email=email)
-        except CentralUser.DoesNotExist:
-            return Response({"detail": "Jeśli ten e-mail istnieje, wyślemy kod."}, status=200)
         
         code_plain = gen_code(6)
 
         sec_ttl = 300
 
-        TwoFactory.objects.create(
+        try:
+            user = CentralUser.objects.get(email=email)
+        except CentralUser.DoesNotExist:
+            return Response({
+                "detail": "Jeśli ten e-mail istnieje, wyślemy kod.",
+                "challenge_id": str(uuid.uuid4()),
+                "purpose": "reset_password"
+            }, status=status.HTTP_200_OK)
+
+        challenge = TwoFactory.objects.create(
             user=user,
             purpose="reset_password",
             code_hmac=hmac_code(code_plain),
             expires_at=default_expires(sec_ttl)
         )
 
-        # Send Email
+        message = f"Twój kod do zmiany hasła: {code_plain}"
+        send_welcome_email.delay(email, message)
 
-        return Response({"detail": "Jeśli ten e-mail istnieje, wyślemy kod."}, status=200)
+        return Response({
+            "detail": "Jeśli ten e-mail istnieje, wyślemy kod.",
+            "challenge_id": str(challenge.id),
+            "purpose": "reset_password"
+        }, status=status.HTTP_200_OK)

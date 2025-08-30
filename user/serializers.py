@@ -40,7 +40,7 @@ class LoginUserSerializer(serializers.Serializer):
         try:
             user = CentralUser.objects.get(email=email, is_user_activated=True)
         except CentralUser.DoesNotExist:
-            raise serializers.ValidationError("User does not exist or is not activated")
+            raise serializers.ValidationError("Invalid credentials")
 
         if not user.check_password(password):
             raise serializers.ValidationError("Invalid credentials")

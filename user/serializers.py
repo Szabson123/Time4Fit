@@ -51,3 +51,19 @@ class LoginUserSerializer(serializers.Serializer):
 
 class ResetPasswordUserSerializer(serializers.Serializer):
     email = serializers.EmailField()
+
+
+class OtpVerifySerializer(serializers.Serializer):
+    challenge_id = serializers.CharField()
+    purpose = serializers.CharField()
+    code = serializers.CharField()
+
+
+class ResetPasswordConfirmSerializer(serializers.Serializer):
+    reset_ticket_id = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Password is too short")
+        return value

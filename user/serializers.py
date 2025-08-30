@@ -20,6 +20,14 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         
         return value
     
+    def create(self, validated_data):
+        password = validated_data.pop("password")
+        user = CentralUser(**validated_data)
+        user.set_password(password)
+        user.is_user_activated = False
+        user.save()
+        return user
+    
 
 class LoginUserSerializer(serializers.Serializer):
     email = serializers.EmailField()

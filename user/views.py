@@ -9,6 +9,7 @@ from rest_framework import status
 from .serializers import RegisterUserSerializer, LoginUserSerializer, ResetPasswordUserSerializer
 from .utils import gen_code, hmac_code, default_expires
 from .models import CentralUser, TwoFactory
+from .tasks import send_welcome_email
 
 from drf_spectacular.utils import extend_schema
 
@@ -29,12 +30,9 @@ class UserRegisterView(GenericAPIView):
         minutes_valid = ttl_sec // 60 or 1
 
         email = data["email"]
-        password = data["password"]
 
         with transaction.atomic():
-            user = CentralUser(email=email, is_user_activated=False)
-            user.set_password(password)
-            user.save()
+            user = serializer.save()
 
             code_plain = gen_code(6)
 
@@ -45,8 +43,8 @@ class UserRegisterView(GenericAPIView):
 
                 expires_at = default_expires(ttl_sec)
             )
-
-            # Send Email with plain code
+            message = f"Witaj w Time4Fit twój kod do rejestracji to {code_plain}"
+            send_welcome_email.delay(email, message)
 
         return Response({
             "challenge_id": str(challenge.id),

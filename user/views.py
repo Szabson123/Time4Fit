@@ -12,6 +12,7 @@ from .utils import gen_code, hmac_code, default_expires
 from .models import CentralUser, TwoFactory
 from .tasks import send_welcome_email
 
+from django.utils import timezone
 
 class UserRegisterView(GenericAPIView):
     serializer_class = RegisterUserSerializer
@@ -166,7 +167,7 @@ class OtpVerifyView(GenericAPIView):
             user.save(update_fields=["is_user_activated"])
 
             return Response(
-                {"refresh": "Gratuluję zarejestorowałeś się teraz możesz się zalogować"},
+                {"refresh": str(refresh), "access": str(refresh.access_token)},
                 status=status.HTTP_200_OK
             )
 
@@ -216,4 +217,10 @@ class ResetPasswordConfirmView(GenericAPIView):
         ticket.used_at = timezone.now()
         ticket.save(update_fields=["used_at"])
 
-        return Response({"detail": "Hasło zostało zmienione. Możesz się zalogować."}, status=status.HTTP_200_OK)
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "detail": "password_changed"
+        })

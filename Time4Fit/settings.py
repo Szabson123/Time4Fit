@@ -13,7 +13,7 @@ if not SECRET_KEY:
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["217.154.252.37"]
+ALLOWED_HOSTS = ["217.154.252.37", "127.0.0.1"]
 
 
 INSTALLED_APPS = [
@@ -25,10 +25,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'user',
+    'user_profile',
+    'event',
 
     'drf_spectacular',
     'rest_framework',
-
     'rest_framework_simplejwt',
     'corsheaders',
 

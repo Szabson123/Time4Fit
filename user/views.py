@@ -13,6 +13,8 @@ from .models import CentralUser, TwoFactory
 from .tasks import send_welcome_email
 
 from django.utils import timezone
+from user_profile.models import UserProfile
+
 
 class UserRegisterView(GenericAPIView):
     serializer_class = RegisterUserSerializer
@@ -30,6 +32,9 @@ class UserRegisterView(GenericAPIView):
         minutes_valid = ttl_sec // 60 or 1
 
         email = data["email"]
+        first_name = data["first_name"]
+        last_name = data["last_name"]
+        phone_number = data["phone_number"]
 
         with transaction.atomic():
             user = serializer.save()
@@ -41,6 +46,12 @@ class UserRegisterView(GenericAPIView):
                 purpose = "register",
                 code_hmac = hmac_code(code_plain),
                 expires_at = default_expires(ttl_sec)
+            )
+            
+            profile = UserProfile.objects.create(
+                first_name=first_name,
+                last_name=last_name,
+                phone_number=phone_number
             )
 
             message = f"Witaj w Time4Fit twój kod do rejestracji to {code_plain}"

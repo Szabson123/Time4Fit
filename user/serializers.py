@@ -3,8 +3,11 @@ from .models import CentralUser
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
-
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    phone_number = serializers.CharField()
     password = serializers.CharField(write_only=True)
+
     class Meta:
         model = CentralUser
         fields = ['email', 'password', 'first_name', 'last_name', 'phone_number']

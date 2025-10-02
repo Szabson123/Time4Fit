@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import CentralUser
+from user_profile.models import UserProfile
 
 
 class RegisterUserSerializer(serializers.ModelSerializer):
@@ -24,11 +25,22 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
+        first_name = validated_data.pop("first_name")
+        last_name = validated_data.pop("last_name")
+        phone_number = validated_data.pop("phone_number")
+
         password = validated_data.pop("password")
         user = CentralUser(**validated_data)
         user.set_password(password)
         user.is_user_activated = False
         user.save()
+
+        UserProfile.objects.create(
+            user=user,
+            name=first_name,
+            surname=last_name,
+            phone_number=phone_number
+        )
         return user
     
 

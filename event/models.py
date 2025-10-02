@@ -53,13 +53,20 @@ class EventAdditionalInfo(models.Model):
     participant_list_show = models.BooleanField(default=False)
     public_event = models.BooleanField(default=True)
     free = models.BooleanField(default=False)
-    price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(0.0)])
+    price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(0.0)], default="0.00")
     payment_in_app = models.BooleanField(default=False)
 
     def full_clean(self):
-        if self.free and self.price != 0:
+        if self.free and self.price != "0.00":
             raise ValidationError("If free cant put price")
     
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class SpecialGuests(models.Model):
+    add_info = models.ForeignKey(EventAdditionalInfo, on_delete=models.CASCADE, related_name='special_guests')
+    name = models.CharField(max_length=255)
+    surname = models.CharField(max_length=255)
+

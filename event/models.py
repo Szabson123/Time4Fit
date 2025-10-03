@@ -3,6 +3,9 @@ import uuid
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
 from user.models import CentralUser
+from datetime import timezone
+import os
+from django.conf import settings
 
 Advanced_Level = (
     ('none', 'None'),
@@ -92,4 +95,12 @@ class EventInvitation(models.Model):
     date_added = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
     is_one_use = models.BooleanField(default=False)
+    
+    @property
+    def is_valid(self):
+        return self.is_active and timezone.now() < self.event.date_time_event
+    
+    @property
+    def link(self):
+        return f"{settings.FRONT_LINK}{self.code}"
     

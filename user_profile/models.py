@@ -10,7 +10,7 @@ Sex_choices = [
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(CentralUser, on_delete=models.CASCADE)
+    user = models.OneToOneField(CentralUser, on_delete=models.CASCADE, related_name="profile")
 
     name = models.CharField(max_length=255, null=True, blank=True)
     surname = models.CharField(max_length=255, null=True, blank=True)

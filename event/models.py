@@ -52,6 +52,11 @@ class Event(models.Model):
     street_number = models.CharField(max_length=255)
     flat_number = models.CharField(max_length=255)
     zip_code = models.CharField(max_length=255)
+    public_event = models.BooleanField(default=True)
+
+    @property
+    def event_participant_count(self):
+        return EventParticipant.objects.filter(event=self).count()
 
 
 class EventAdditionalInfo(models.Model):
@@ -60,7 +65,6 @@ class EventAdditionalInfo(models.Model):
     places_for_people_limit = models.PositiveIntegerField()
     age_limit = models.CharField(choices=Age_Groups, max_length=255)
     participant_list_show = models.BooleanField(default=False)
-    public_event = models.BooleanField(default=True)
     free = models.BooleanField(default=False)
     price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(0.0)], default="0.00")
     payment_in_app = models.BooleanField(default=False)
@@ -68,6 +72,10 @@ class EventAdditionalInfo(models.Model):
     def full_clean(self):
         if self.free and self.price != "0.00":
             raise ValidationError("If free cant put price")
+    
+    @property
+    def true_price(self):
+        return self.price if self.price else "free"
     
     def save(self, *args, **kwargs):
         self.full_clean()
@@ -95,6 +103,7 @@ class EventInvitation(models.Model):
     date_added = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
     is_one_use = models.BooleanField(default=False)
+    created_by = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
     
     @property
     def is_valid(self):

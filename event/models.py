@@ -18,6 +18,12 @@ Age_Groups = (
     # Add more
 )   
 
+Roles_Participant = (
+    ('participant', 'Participant'),
+    ('admin', 'Admin'),
+    ('treiner', 'Trainer')
+)
+
 class Category(models.Model):
     name = models.CharField(max_length=255)
 
@@ -70,3 +76,20 @@ class SpecialGuests(models.Model):
     name = models.CharField(max_length=255)
     surname = models.CharField(max_length=255)
 
+
+class EventParticipant(models.Model):
+    user = models.ForeignKey(CentralUser, on_delete=models.CASCADE, related_name='eventparticipant')
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='eventparticipant')
+
+    role = models.CharField(max_length=255, choices=Roles_Participant, default='participant')
+    paid_status = models.BooleanField(default=False)
+    presense = models.BooleanField(null=True, default=True)
+
+
+class EventInvitation(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='eventinvitation')
+    code = models.CharField(max_length=8)
+    date_added = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(default=False)
+    is_one_use = models.BooleanField(default=False)
+    

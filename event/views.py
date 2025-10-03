@@ -16,7 +16,6 @@ class EventViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
-        
 
 class CategoryListView(ListAPIView):
     serializer_class = CategorySerializer

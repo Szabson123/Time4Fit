@@ -1,6 +1,7 @@
-from .models import Event, EventAdditionalInfo, SpecialGuests, Category
+from .models import Event, EventAdditionalInfo, SpecialGuests, Category, EventParticipant
 from rest_framework import serializers
-
+from user_profile.models import UserProfile
+from user.models import CentralUser
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -84,3 +85,23 @@ class EventSerializer(serializers.ModelSerializer):
             info_serializer.save()
 
         return instance
+    
+
+class ProfileEventParticipantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['name', 'surname', 'phone_number', 'profile_picture']
+
+
+class UserEventParticipantSerializer(serializers.ModelSerializer):
+    profile = ProfileEventParticipantSerializer(read_only=True)
+    class Meta:
+        model = CentralUser
+        fields = ['id', 'email', 'profile']
+
+
+class EventParticipantSerializer(serializers.ModelSerializer):
+    user_profile = UserEventParticipantSerializer(read_only=True)
+    class Meta:
+        model = EventParticipant
+        fields = ['id', 'user_profile', 'role', 'paid_status', 'presense']

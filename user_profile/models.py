@@ -18,3 +18,4 @@ class UserProfile(models.Model):
 
     birth_day = models.DateField(null=True, blank=True)
     sex = models.CharField(max_length=255, choices=Sex_choices, default='none')
+    profile_picture = models.ImageField(null=True, blank=True, upload_to="profile_pictures/")

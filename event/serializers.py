@@ -1,4 +1,5 @@
 from .models import Event, EventAdditionalInfo, EventInvitation, SpecialGuests, Category, EventParticipant
+from django.utils import timezone
 from rest_framework import serializers
 from user_profile.models import UserProfile
 from user.models import CentralUser
@@ -56,6 +57,11 @@ class EventSerializer(serializers.ModelSerializer):
                 'latitude', 'longitude', 'public_event',
                 'country', 'city', 'street', 'street_number', 'flat_number', 'zip_code', 'event_participant_count',
                 'additional_info']
+        
+    def validate_date_time_event(self, value):
+        if value < timezone.now():
+            raise serializers.ValidationError("You cant create event in the past")
+        return value
         
     def create(self, validated_data):
         additional_info_data = validated_data.pop("additional_info")

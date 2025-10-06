@@ -1,6 +1,9 @@
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Q
+from django.utils import timezone
 from rest_framework import viewsets, response, status
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView, CreateAPIView
@@ -9,9 +12,15 @@ from .serializers import EventSerializer, EventInvitationCreateSerializer, Event
 from .models import Event, Category, EventParticipant, EventInvitation
 
 
+class CustomPagination(PageNumberPagination):
+    page_size = 50
+    max_page_size = 100
+
+
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -25,7 +34,7 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if self.action == "list":
-            return Event.objects.filter(public_event=True)
+            return Event.objects.filter(public_event=True, date_time_event__gte = timezone.now())
         
         if self.action == "retrieve":
             return Event.objects.filter(
@@ -38,6 +47,7 @@ class EventViewSet(viewsets.ModelViewSet):
 class CategoryListView(ListAPIView):
     serializer_class = CategorySerializer
     queryset = Category.objects.all()
+    permission_classes = [IsAuthenticated]
 
 
 class EventParticipantList(ListAPIView):
@@ -60,6 +70,7 @@ class EventParticipantList(ListAPIView):
 
 class EventInvitationListView(ListAPIView):
     serializer_class = EventInvitationSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
@@ -77,6 +88,7 @@ class EventInvitationListView(ListAPIView):
 
 class EventInvitationCreateView(CreateAPIView):
     serializer_class = EventInvitationCreateSerializer
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         event_id = self.kwargs.get('event_id')

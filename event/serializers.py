@@ -109,7 +109,6 @@ class EventAdditionalInfoListSerializer(serializers.ModelSerializer):
 
 class EventListSerializer(serializers.ModelSerializer):
     additional_info = EventAdditionalInfoListSerializer(read_only=True)
-
     category_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -161,5 +160,42 @@ class EventInvitationCreateSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class EventInvSerializer(serializers.Serializer):
-    pass
+class ProfileEvenSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['name', 'surname']
+
+
+class EventSimpleSerializer(serializers.ModelSerializer):
+    profile = ProfileEvenSimpleSerializer(read_only=True)
+    class Meta:
+        model = CentralUser
+        fields = ['id', 'profile']
+
+
+class EventInvSerializer(serializers.ModelSerializer):
+    author = EventSimpleSerializer(read_only=True)
+    additional_info = EventAdditionalInfoListSerializer(read_only=True)
+    category_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Event
+        fields = ['id', 'author', 'category_name', 'title', 'additional_info', 'event_participant_count']
+
+    def get_category_name(self, obj):
+        return obj.category.name if obj.category else None
+    
+
+class CodeSerializer(serializers.Serializer):
+    code = serializers.CharField(required=True)
+
+    def validate_code(self, value):
+        try:
+            inv = EventInvitation.objects.get(code=value)
+        except EventInvitation.DoesNotExist:
+            raise serializers.ValidationError("Invalid invitation code.")
+
+        if not inv.is_valid_code:
+            raise serializers.ValidationError("Invitation expired or inactive.")
+
+        return value

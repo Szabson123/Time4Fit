@@ -1,11 +1,13 @@
-from django.db import models
 import uuid
+
+from django.db import models
 from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
-from user.models import CentralUser
-from datetime import timezone
-import os
+from django.utils import timezone
 from django.conf import settings
+
+from user.models import CentralUser
+
 
 Advanced_Level = (
     ('none', 'None'),
@@ -94,9 +96,19 @@ class EventInvitation(models.Model):
     date_added = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
     is_one_use = models.BooleanField(default=False)
+    is_used = models.BooleanField(default=False)
     created_by = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
     
     @property
     def link(self):
         return f"{settings.FRONT_LINK}{self.code}"
     
+    @property
+    def is_valid_code(self):
+        """Sprawdza, czy zaproszenie jest aktualnie ważne"""
+        now = timezone.now()
+        event_date = getattr(self.event, 'date_time_event', None)
+
+        if event_date and event_date < now:
+            return False
+        return self.is_active and not self.is_used

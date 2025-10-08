@@ -9,7 +9,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView, CreateAPIView, GenericAPIView
 from rest_framework.exceptions import PermissionDenied
 
-from .serializers import EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CategorySerializer, EventParticipantSerializer, EventInvitationSerializer
+from .serializers import( EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CodeSerializer,
+                          CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer)
+
 from .models import Event, Category, EventParticipant, EventInvitation
 
 
@@ -102,4 +104,40 @@ class EventInvitationCreateView(CreateAPIView):
 
 
 class InvGetInfoOfEvent(GenericAPIView):
-    pass
+    serializer_class = EventInvSerializer
+    def get(self, request, *args, **kwargs):
+        code = self.kwargs.get('inv_code')
+
+        inv = EventInvitation.objects.filter(code=code).first()
+
+        if not inv or not inv.is_valid_code:
+            return Response({"error": "Invalid or expired invitation"}, status=400)
+
+
+        serializer = self.get_serializer(inv.event)
+        return Response(serializer.data)
+    
+
+class InvGetIntoEvent(GenericAPIView):
+    serializer_class = CodeSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        user = self.request.user
+        serializer.is_valid(raise_exception=True)
+
+        code = serializer.validated_data['code']
+        inv = EventInvitation.objects.filter(code=code).first()
+
+        if inv.is_one_use:
+            inv.is_used = True
+            inv.save(update_fields=["is_used"])
+        
+        EventParticipant.objects.get_or_create(
+            user=user,
+            event=inv.event,
+            role='participant',
+        )
+
+        return Response("success", status=status.HTTP_200_OK)

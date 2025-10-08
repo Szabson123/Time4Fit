@@ -4,6 +4,7 @@ from rest_framework import serializers
 from user_profile.models import UserProfile
 from user.models import CentralUser
 import random, string
+from decimal import Decimal
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -24,6 +25,13 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
         model = EventAdditionalInfo
         fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'participant_list_show', 'free', 'price', 'payment_in_app', 'special_guests']
 
+    def validate(self, data):
+        if data.get('free') and data.get('price') and data['price'] != Decimal("0.00"):
+            raise serializers.ValidationError({
+                "price": "If 'free' is true, price must be 0.00."
+            })
+        return data
+    
     def create(self, validated_data):
         guest_data = validated_data.pop("special_guests", [])
         add_info = EventAdditionalInfo.objects.create(**validated_data)
@@ -96,17 +104,21 @@ class EventSerializer(serializers.ModelSerializer):
 class EventAdditionalInfoListSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventAdditionalInfo
-        fields = ['advanced_level', 'places_for_people_limit']
+        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'true_price']
 
 
 class EventListSerializer(serializers.ModelSerializer):
-    special_guests = SpecialGuestSerializer(many=True, read_only=True)
     additional_info = EventAdditionalInfoListSerializer(read_only=True)
+
+    category_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
-        fields = ['id', 'title', 'short_desc', 'special_guests', 'additional_info', 'event_participant_count']
+        fields = ['id', 'date_time_event', 'title', 'short_desc', 'category_name', 'additional_info', 'event_participant_count']
     
+    def get_category_name(self, obj):
+        return obj.category.name if obj.category else None
+
 
 class ProfileEventParticipantSerializer(serializers.ModelSerializer):
     class Meta:

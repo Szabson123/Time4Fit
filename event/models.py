@@ -97,10 +97,6 @@ class EventInvitation(models.Model):
     created_by = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
     
     @property
-    def is_valid(self):
-        return self.is_active and timezone.now() < self.event.date_time_event
-    
-    @property
     def link(self):
         return f"{settings.FRONT_LINK}{self.code}"
     

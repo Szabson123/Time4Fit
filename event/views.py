@@ -6,7 +6,8 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.generics import ListAPIView, CreateAPIView
+from rest_framework.generics import ListAPIView, CreateAPIView, GenericAPIView
+from rest_framework.exceptions import PermissionDenied
 
 from .serializers import EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CategorySerializer, EventParticipantSerializer, EventInvitationSerializer
 from .models import Event, Category, EventParticipant, EventInvitation
@@ -78,12 +79,12 @@ class EventInvitationListView(ListAPIView):
         event = get_object_or_404(Event, pk=event_id)
 
         if user == event.author:
-            return EventInvitation.objects.filter(event=event)
+            return EventInvitation.objects.select_related("event").filter(event=event)
 
         if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'treiner']).exists():
-            return EventInvitation.objects.filter(event=event)
+            return EventInvitation.objects.select_related("event").filter(event=event)
         
-        raise Response({"error": "You dont have permissions", "code": "no_perm"}, status=status.HTTP_400_BAD_REQUEST)
+        raise PermissionDenied(detail="You don't have permissions")
     
 
 class EventInvitationCreateView(CreateAPIView):
@@ -99,3 +100,6 @@ class EventInvitationCreateView(CreateAPIView):
         
         serializer.save(created_by=self.request.user, event=event)
 
+
+class InvGetInfoOfEvent(GenericAPIView):
+    pass

@@ -141,9 +141,13 @@ class EventParticipantSerializer(serializers.ModelSerializer):
 
 
 class EventInvitationSerializer(serializers.ModelSerializer):
+    is_valid = serializers.SerializerMethodField()
     class Meta:
         model = EventInvitation
         fields = ['id', 'code', 'date_added', 'is_one_use', 'is_valid', 'link']
+
+    def get_is_valid(self, obj):
+        return obj.is_active and timezone.now() < obj.event.date_time_event
 
 
 class EventInvitationCreateSerializer(serializers.ModelSerializer):
@@ -155,3 +159,7 @@ class EventInvitationCreateSerializer(serializers.ModelSerializer):
         validated_data["code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
         validated_data["is_active"] = True
         return super().create(validated_data)
+
+
+class EventInvSerializer(serializers.Serializer):
+    pass

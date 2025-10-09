@@ -1,16 +1,18 @@
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
-from rest_framework import viewsets, response, status
+
+from rest_framework import viewsets, status, mixins
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView, CreateAPIView, GenericAPIView
 from rest_framework.exceptions import PermissionDenied
 
 from .serializers import( EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CodeSerializer,
-                          CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer)
+                          CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer, NoneSerializer)
 
 from .models import Event, Category, EventParticipant, EventInvitation
 
@@ -71,9 +73,17 @@ class EventParticipantList(ListAPIView):
         raise Response({"error": "You dont have permissions", "code": "no_perm"}, status=status.HTTP_400_BAD_REQUEST)
     
 
-class EventInvitationListView(ListAPIView):
-    serializer_class = EventInvitationSerializer
+class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
+    serializer_class = EventInvitationCreateSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return EventInvitationSerializer
+        elif self.action == 'deactivate':
+            return NoneSerializer
+        
+        return EventInvitationCreateSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -87,20 +97,32 @@ class EventInvitationListView(ListAPIView):
             return EventInvitation.objects.select_related("event").filter(event=event)
         
         raise PermissionDenied(detail="You don't have permissions")
-    
-
-class EventInvitationCreateView(CreateAPIView):
-    serializer_class = EventInvitationCreateSerializer
-    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         event_id = self.kwargs.get('event_id')
         event = get_object_or_404(Event, pk=event_id)
 
         if event.author != self.request.user:
-            raise Response({"error": "You dont have permissions", "code": "no_perm"}, status=status.HTTP_400_BAD_REQUEST)
+            raise PermissionDenied(detail="You don't have permissions to invite users to this event.")
         
         serializer.save(created_by=self.request.user, event=event)
+
+    @action(detail=True, methods=['post'])
+    def deactivate(self, request, pk=None, *args, **kwargs):
+        invitation = self.get_object()
+
+        if invitation.event.author != request.user:
+            return Response(
+                {"error": "You dont have permissions"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        invitation.is_active = False
+        invitation.save(update_fields=["is_active"])
+
+        return Response(
+            {"status": "deactivated", "invitation_id": invitation.id}
+        )
 
 
 class InvGetInfoOfEvent(GenericAPIView):
@@ -112,7 +134,6 @@ class InvGetInfoOfEvent(GenericAPIView):
 
         if not inv or not inv.is_valid_code:
             return Response({"error": "Invalid or expired invitation"}, status=400)
-
 
         serializer = self.get_serializer(inv.event)
         return Response(serializer.data)

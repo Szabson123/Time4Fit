@@ -199,3 +199,7 @@ class CodeSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invitation expired or inactive.")
 
         return value
+    
+
+class NoneSerializer(serializers.Serializer):
+    pass

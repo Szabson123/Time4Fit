@@ -80,7 +80,7 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
     def get_serializer_class(self):
         if self.action == 'list':
             return EventInvitationSerializer
-        elif self.action == 'deactivate':
+        elif self.action == 'deactivate' or self.action == 'activate':
             return NoneSerializer
         
         return EventInvitationCreateSerializer
@@ -122,6 +122,23 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
 
         return Response(
             {"status": "deactivated", "invitation_id": invitation.id}
+        )
+    
+    @action(detail=True, methods=['post'])
+    def activate(self, request, pk=None, *args, **kwargs):
+        invitation = self.get_object()
+
+        if invitation.event.author != request.user:
+            return Response(
+                {"error": "You dont have permissions"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        invitation.is_active = True
+        invitation.save(update_fields=["is_active"])
+
+        return Response(
+            {"status": "activate", "invitation_id": invitation.id}
         )
 
 

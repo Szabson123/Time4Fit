@@ -49,8 +49,7 @@ class UserRegisterView(GenericAPIView):
             )
 
             message = f"Witaj w Time4Fit twój kod do rejestracji to {code_plain}"
-            # send_welcome_email.delay(email, message)
-            print(code_plain)
+            send_welcome_email.delay(email, message)
 
         return Response({
             "challenge_id": str(challenge.id),
@@ -83,8 +82,7 @@ class UserLoginView(GenericAPIView):
             )
             
         message = f"Witaj w Time4Fit twój kod do logowania to {code_plain}"
-        # send_welcome_email.delay(user.email, message)
-        print(code_plain)
+        send_welcome_email.delay(user.email, message)
 
         return Response({
             "challenge_id": str(challenge.id),

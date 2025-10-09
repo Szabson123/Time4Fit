@@ -6,6 +6,8 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.conf import settings
 
+from decimal import Decimal
+
 from user.models import CentralUser
 
 
@@ -62,7 +64,7 @@ class EventAdditionalInfo(models.Model):
     age_limit = models.CharField(max_length=255, null=True, blank=True)
     participant_list_show = models.BooleanField(default=False)
     free = models.BooleanField(default=False)
-    price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(0.0)], default="0.00")
+    price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(Decimal('0.00'))], default="0.00")
     payment_in_app = models.BooleanField(default=False)
 
 

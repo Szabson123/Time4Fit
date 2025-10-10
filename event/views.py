@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils import timezone
 from django.db import transaction
 
@@ -20,10 +20,9 @@ from .models import Event, Category, EventParticipant, EventInvitation, PARTICIP
 from .permissions import IsEventAuthor
 
 
-
 class CustomPagination(PageNumberPagination):
-    page_size = 50
-    max_page_size = 100
+    page_size = 20
+    max_page_size = 60
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -42,16 +41,30 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if self.action == "list":
-            return Event.objects.filter(public_event=True, date_time_event__gte = timezone.now())
-        
-        if self.action == "retrieve":
-            return Event.objects.filter(
-                Q(public_event=True) | Q(eventparticipant__user=user) | Q(author=user)
-            ).distinct()
 
-        return Event.objects.filter(author=user)
-    
+        base_qs = Event.objects.select_related('category', 'additional_info')
+
+        if self.action == "list":
+            return (
+                base_qs
+                .filter(public_event=True, date_time_event__gte=timezone.now())
+                .annotate(event_participant_count=Count('eventparticipant'))
+            )
+
+        if self.action == "retrieve":
+            return (
+                base_qs
+                .filter(
+                    Q(public_event=True) |
+                    Q(eventparticipant__user=user) |
+                    Q(author=user)
+                )
+                .annotate(event_participant_count=Count('eventparticipant'))
+                .distinct()
+            )
+
+        return base_qs.filter(author=user)
+
 
 class CategoryListView(ListAPIView):
     serializer_class = CategorySerializer
@@ -71,7 +84,7 @@ class EventParticipantList(ListAPIView):
         if user == event.author:
             return EventParticipant.objects.filter(event=event)
 
-        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'treiner']).exists():
+        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
             return EventParticipant.objects.filter(event=event)
 
         raise PermissionDenied(detail="You don't have permissions")
@@ -87,7 +100,7 @@ class ChangeUserRankInEvent(GenericAPIView):
         participant_id = kwargs.get('participant_id')
         event = get_object_or_404(Event, pk=event_id)
 
-        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'treiner']).exists():
+        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists() or request.user == event.author:
             
             participant = get_object_or_404(EventParticipant, pk=participant_id, event=event)
 
@@ -179,9 +192,16 @@ class InvGetInfoOfEvent(GenericAPIView):
         inv = EventInvitation.objects.filter(code=code).first()
 
         if not inv or not inv.is_valid_code:
-            return Response({"error": "Invalid or expired invitation"}, status=400)
+            return Response({"error": "Invalid or expired invitation"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        event = (
+            Event.objects
+            .annotate(event_participant_count=Count('eventparticipant'))
+            .select_related('author', 'additional_info', 'category')
+            .get(pk=inv.event.pk)
+        )
 
-        serializer = self.get_serializer(inv.event)
+        serializer = self.get_serializer(event)
         return Response(serializer.data)
     
 
@@ -197,16 +217,16 @@ class InvGetIntoEvent(GenericAPIView):
 
         inv = EventInvitation.objects.select_for_update().filter(code=code).first()
         if not inv or not inv.is_valid_code:
-            return Response({"detail": "Invalid or expired invitation"}, status=400)
+            return Response({"detail": "Invalid or expired invitation"}, status=status.HTTP_400_BAD_REQUEST)
 
         event = inv.event
         # limit miejsc
-        
+
         add = getattr(event, 'additional_info', None)
         if add and add.places_for_people_limit:
             current = EventParticipant.objects.select_for_update().filter(event=event).count()
             if current >= add.places_for_people_limit:
-                return Response({"detail": "No seats available"}, status=409)
+                return Response({"detail": "No seats available"}, status=status.HTTP_400_BAD_REQUEST)
 
         obj, created = EventParticipant.objects.get_or_create(
             user=request.user, event=event, defaults={'role': 'participant'}
@@ -214,8 +234,8 @@ class InvGetIntoEvent(GenericAPIView):
 
         if inv.is_one_use:
             if inv.is_used:
-                return Response({"detail": "Invitation already used"}, status=409)
+                return Response({"detail": "Invitation already used"}, status=status.HTTP_400_BAD_REQUEST)
             inv.is_used = True
             inv.save(update_fields=["is_used"])
 
-        return Response({"status": "success"}, status=200)
+        return Response({"status": "success"}, status=status.HTTP_200_OK)

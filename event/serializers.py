@@ -69,14 +69,11 @@ class EventSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         additional_info_data = validated_data.pop("additional_info")
-
         event = Event.objects.create(**validated_data)
-        add_ser = EventAdditionalInfoSerializer().create({
-            **additional_info_data,
-            "event": event
-        })
-        add_ser.is_valid(raise_exception=True)
-        add_ser.save()
+
+        info_ser = EventAdditionalInfoSerializer(data={**additional_info_data, "event": event})
+        info_ser.is_valid(raise_exception=True)
+        info_ser.save()
 
         return event
     
@@ -138,14 +135,11 @@ class EventParticipantSerializer(serializers.ModelSerializer):
 
 
 class EventInvitationSerializer(serializers.ModelSerializer):
-    is_valid = serializers.SerializerMethodField()
-
+    is_valid = serializers.ReadOnlyField(source='is_valid')
+    
     class Meta:
         model = EventInvitation
         fields = ['id', 'code', 'date_added', 'is_one_use', 'is_valid', 'link']
-
-    def get_is_valid(self, obj):
-        return obj.is_active and timezone.now() < obj.event.date_time_event and not obj.is_used
 
 
 class EventInvitationCreateSerializer(serializers.ModelSerializer):

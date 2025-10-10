@@ -1,7 +1,7 @@
 import uuid
 
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.conf import settings
@@ -37,11 +37,11 @@ class Event(models.Model):
     short_desc = models.CharField(max_length=255)
     long_desc = models.TextField(null=True, blank=True)
     date_time_event = models.DateTimeField()
-    duration_min = models.PositiveIntegerField()
+    duration_min = models.PositiveIntegerField(validators=[MinValueValidator(1)])
 
     # For map
-    latitude = models.FloatField()
-    longitude = models.FloatField()
+    latitude = models.FloatField(validators=[MinValueValidator(-90), MaxValueValidator(90)])
+    longitude = models.FloatField(validators=[MinValueValidator(-180), MaxValueValidator(180)])
 
     # For user
     country = models.CharField(max_length=255, blank=True, null=True)
@@ -52,15 +52,11 @@ class Event(models.Model):
     zip_code = models.CharField(max_length=255, blank=True, null=True)
     public_event = models.BooleanField(default=True)
 
-    @property
-    def event_participant_count(self):
-        return EventParticipant.objects.filter(event=self).count()
-
 
 class EventAdditionalInfo(models.Model):
     event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="additional_info")
     advanced_level = models.CharField(choices=ADVANCED_LEVEL, max_length=255, default='none')
-    places_for_people_limit = models.PositiveIntegerField()
+    places_for_people_limit = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     age_limit = models.CharField(max_length=255, null=True, blank=True)
     participant_list_show = models.BooleanField(default=False)
     price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(Decimal('0.00'))], default="0.00")
@@ -104,11 +100,5 @@ class EventInvitation(models.Model):
         return f"{settings.FRONT_LINK}{self.code}"
     
     @property
-    def is_valid_code(self):
-        """Sprawdza, czy zaproszenie jest aktualnie ważne"""
-        now = timezone.now()
-        event_date = getattr(self.event, 'date_time_event', None)
-
-        if event_date and event_date < now:
-            return False
-        return self.is_active and not self.is_used
+    def is_valid(self) -> bool:
+        return self.is_active and not self.is_used and self.event.date_time_event >= timezone.now()

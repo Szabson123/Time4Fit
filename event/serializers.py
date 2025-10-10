@@ -52,6 +52,7 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
 
 class EventSerializer(serializers.ModelSerializer):
     additional_info = EventAdditionalInfoSerializer()
+    event_participant_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Event
@@ -105,6 +106,7 @@ class EventAdditionalInfoListSerializer(serializers.ModelSerializer):
 class EventListSerializer(serializers.ModelSerializer):
     additional_info = EventAdditionalInfoListSerializer(read_only=True)
     category_name = serializers.SerializerMethodField()
+    event_participant_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Event
@@ -135,8 +137,8 @@ class EventParticipantSerializer(serializers.ModelSerializer):
 
 
 class EventInvitationSerializer(serializers.ModelSerializer):
-    is_valid = serializers.ReadOnlyField(source='is_valid')
-    
+    is_valid = serializers.ReadOnlyField()
+
     class Meta:
         model = EventInvitation
         fields = ['id', 'code', 'date_added', 'is_one_use', 'is_valid', 'link']
@@ -174,6 +176,7 @@ class EventInvSerializer(serializers.ModelSerializer):
     author = EventSimpleSerializer(read_only=True)
     additional_info = EventAdditionalInfoListSerializer(read_only=True)
     category_name = serializers.SerializerMethodField()
+    event_participant_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Event

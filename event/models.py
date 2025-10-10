@@ -11,26 +11,26 @@ from decimal import Decimal
 from user.models import CentralUser
 
 
-Advanced_Level = (
+ADVANCED_LEVEL = [
     ('none', 'None'),
-    ('begginer', 'Begginer'),
+    ('beginner', 'Beginner'),
     ('semi-advanced', 'Semi-advanced'),
     ('advanced', 'Advanced'),
-    ('all', 'All')
-)
+    ('all', 'All'),
+]
 
-Roles_Participant = (
+PARTICIPANT_ROLES = [
     ('participant', 'Participant'),
     ('admin', 'Admin'),
-    ('treiner', 'Trainer')
-)
+    ('trainer', 'Trainer'),
+]
 
 class Category(models.Model):
     name = models.CharField(max_length=255)
 
 
 class Event(models.Model):
-    unique_id = models.UUIDField(default=uuid.uuid4)
+    unique_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     author = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
@@ -44,12 +44,12 @@ class Event(models.Model):
     longitude = models.FloatField()
 
     # For user
-    country = models.CharField(max_length=255)
-    city = models.CharField(max_length=255)
-    street = models.CharField(max_length=255)
-    street_number = models.CharField(max_length=255)
-    flat_number = models.CharField(max_length=255)
-    zip_code = models.CharField(max_length=255)
+    country = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=255, blank=True, null=True)
+    street = models.CharField(max_length=255, blank=True, null=True)
+    street_number = models.CharField(max_length=255, blank=True, null=True)
+    flat_number = models.CharField(max_length=255, blank=True, null=True)
+    zip_code = models.CharField(max_length=255, blank=True, null=True)
     public_event = models.BooleanField(default=True)
 
     @property
@@ -59,22 +59,12 @@ class Event(models.Model):
 
 class EventAdditionalInfo(models.Model):
     event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="additional_info")
-    advanced_level = models.CharField(choices=Advanced_Level, max_length=255, default='none')
+    advanced_level = models.CharField(choices=ADVANCED_LEVEL, max_length=255, default='none')
     places_for_people_limit = models.PositiveIntegerField()
     age_limit = models.CharField(max_length=255, null=True, blank=True)
     participant_list_show = models.BooleanField(default=False)
-    free = models.BooleanField(default=False)
     price = models.DecimalField(decimal_places=2, max_digits=10, validators=[MinValueValidator(Decimal('0.00'))], default="0.00")
     payment_in_app = models.BooleanField(default=False)
-
-
-    @property
-    def true_price(self):
-        return self.price if self.price else "free"
-    
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 class SpecialGuests(models.Model):
@@ -87,14 +77,22 @@ class EventParticipant(models.Model):
     user = models.ForeignKey(CentralUser, on_delete=models.CASCADE, related_name='eventparticipant')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='eventparticipant')
 
-    role = models.CharField(max_length=255, choices=Roles_Participant, default='participant')
+    role = models.CharField(max_length=255, choices=PARTICIPANT_ROLES, default='participant')
     paid_status = models.BooleanField(default=False)
     presense = models.BooleanField(null=True, default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'event'], name='unique_user_event')
+        ]
+
+    def __str__(self):
+        return f"{self.user} in {self.event} ({self.role})"
 
 
 class EventInvitation(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='eventinvitation')
-    code = models.CharField(max_length=8)
+    code = models.CharField(max_length=8, unique=True)
     date_added = models.DateField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
     is_one_use = models.BooleanField(default=False)

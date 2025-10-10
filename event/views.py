@@ -12,9 +12,11 @@ from rest_framework.generics import ListAPIView, CreateAPIView, GenericAPIView
 from rest_framework.exceptions import PermissionDenied
 
 from .serializers import( EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CodeSerializer,
-                          CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer, NoneSerializer)
+                          CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer, NoneSerializer,
+                          ChangeRoleSerializer)
 
-from .models import Event, Category, EventParticipant, EventInvitation
+from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES
+from .permissions import IsEventAuthor
 
 
 class CustomPagination(PageNumberPagination):
@@ -43,7 +45,7 @@ class EventViewSet(viewsets.ModelViewSet):
         
         if self.action == "retrieve":
             return Event.objects.filter(
-                Q(public_event=True) | Q(eventparticipant__user=user)
+                Q(public_event=True) | Q(eventparticipant__user=user) | Q(author=user)
             ).distinct()
 
         return Event.objects.filter(author=user)
@@ -70,8 +72,45 @@ class EventParticipantList(ListAPIView):
         if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'treiner']).exists():
             return EventParticipant.objects.filter(event=event)
 
-        raise Response({"error": "You dont have permissions", "code": "no_perm"}, status=status.HTTP_400_BAD_REQUEST)
+        raise PermissionDenied(detail="You don't have permissions")
     
+
+class ChangeUserRankInEvent(GenericAPIView):
+    serializer_class = ChangeRoleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        event_id = kwargs.get('event_id')
+        participant_id = kwargs.get('participant_id')
+        event = get_object_or_404(Event, pk=event_id)
+
+        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'treiner']).exists():
+            
+            participant = get_object_or_404(EventParticipant, pk=participant_id, event=event)
+
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            new_role = serializer.validated_data['new_role']
+
+            if new_role == participant.role:
+                return Response({"detail": "Already has this role."}, status=status.HTTP_200_OK)
+            
+            if new_role not in PARTICIPANT_ROLES.values:
+                return Response({"detail": "This role doesn't exist."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            participant.role = new_role
+            participant.save(update_fields=["role"])
+
+            return Response({
+                "status": "changed role",
+                "participant": EventParticipantSerializer(participant).data
+            })
+        
+        else:
+            raise PermissionDenied(detail="You don't have permissions")
+
 
 class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = EventInvitationCreateSerializer
@@ -107,16 +146,9 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         
         serializer.save(created_by=self.request.user, event=event)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsEventAuthor])
     def deactivate(self, request, pk=None, *args, **kwargs):
         invitation = self.get_object()
-
-        if invitation.event.author != request.user:
-            return Response(
-                {"error": "You dont have permissions"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         invitation.is_active = False
         invitation.save(update_fields=["is_active"])
 
@@ -124,16 +156,9 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
             {"status": "deactivated", "invitation_id": invitation.id}
         )
     
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsEventAuthor])
     def activate(self, request, pk=None, *args, **kwargs):
         invitation = self.get_object()
-
-        if invitation.event.author != request.user:
-            return Response(
-                {"error": "You dont have permissions"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
         invitation.is_active = True
         invitation.save(update_fields=["is_active"])
 

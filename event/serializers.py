@@ -23,14 +23,8 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
     class Meta:
 
         model = EventAdditionalInfo
-        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'participant_list_show', 'free', 'price', 'payment_in_app', 'special_guests']
+        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'participant_list_show', 'price', 'payment_in_app', 'special_guests']
 
-    def validate(self, data):
-        if data.get('free') and data.get('price') and data['price'] != Decimal("0.00"):
-            raise serializers.ValidationError({
-                "price": "If 'free' is true, price must be 0.00."
-            })
-        return data
     
     def create(self, validated_data):
         guest_data = validated_data.pop("special_guests", [])
@@ -104,7 +98,7 @@ class EventSerializer(serializers.ModelSerializer):
 class EventAdditionalInfoListSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventAdditionalInfo
-        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'true_price']
+        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'price']
 
 
 class EventListSerializer(serializers.ModelSerializer):
@@ -141,12 +135,13 @@ class EventParticipantSerializer(serializers.ModelSerializer):
 
 class EventInvitationSerializer(serializers.ModelSerializer):
     is_valid = serializers.SerializerMethodField()
+
     class Meta:
         model = EventInvitation
         fields = ['id', 'code', 'date_added', 'is_one_use', 'is_valid', 'link']
 
     def get_is_valid(self, obj):
-        return obj.is_active and timezone.now() < obj.event.date_time_event
+        return obj.is_active and timezone.now() < obj.event.date_time_event and not obj.is_used
 
 
 class EventInvitationCreateSerializer(serializers.ModelSerializer):
@@ -155,8 +150,12 @@ class EventInvitationCreateSerializer(serializers.ModelSerializer):
         fields = ['is_one_use', 'is_active']
 
     def create(self, validated_data):
-        validated_data["code"] = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        validated_data["is_active"] = True
+        while True:
+            code = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            if not EventInvitation.objects.filter(code=code).exists():
+                validated_data["code"] = code
+                break
+
         return super().create(validated_data)
 
 
@@ -203,3 +202,7 @@ class CodeSerializer(serializers.Serializer):
 
 class NoneSerializer(serializers.Serializer):
     pass
+
+
+class ChangeRoleSerializer(serializers.Serializer):
+    new_role = serializers.CharField(required=True)

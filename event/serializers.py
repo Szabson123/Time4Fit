@@ -24,7 +24,7 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
     class Meta:
 
         model = EventAdditionalInfo
-        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'participant_list_show', 'price', 'payment_in_app', 'special_guests']
+        fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'price', 'payment_in_app', 'special_guests']
 
     
     def create(self, validated_data):

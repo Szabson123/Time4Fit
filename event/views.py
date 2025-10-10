@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Q
 from django.utils import timezone
+from django.db import transaction
 
 from rest_framework import viewsets, status, mixins
 from rest_framework.pagination import PageNumberPagination
@@ -17,6 +18,7 @@ from .serializers import( EventSerializer, EventInvitationCreateSerializer, Even
 
 from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES
 from .permissions import IsEventAuthor
+
 
 
 class CustomPagination(PageNumberPagination):
@@ -97,7 +99,9 @@ class ChangeUserRankInEvent(GenericAPIView):
             if new_role == participant.role:
                 return Response({"detail": "Already has this role."}, status=status.HTTP_200_OK)
             
-            if new_role not in PARTICIPANT_ROLES.values:
+            VALID_ROLES = [r[0] for r in PARTICIPANT_ROLES]
+
+            if new_role not in VALID_ROLES:
                 return Response({"detail": "This role doesn't exist."}, status=status.HTTP_400_BAD_REQUEST)
             
             participant.role = new_role
@@ -132,7 +136,7 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         if user == event.author:
             return EventInvitation.objects.select_related("event").filter(event=event)
 
-        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'treiner']).exists():
+        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
             return EventInvitation.objects.select_related("event").filter(event=event)
         
         raise PermissionDenied(detail="You don't have permissions")
@@ -185,22 +189,33 @@ class InvGetIntoEvent(GenericAPIView):
     serializer_class = CodeSerializer
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        user = self.request.user
-        serializer.is_valid(raise_exception=True)
+        ser = self.get_serializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        code = ser.validated_data['code']
 
-        code = serializer.validated_data['code']
-        inv = EventInvitation.objects.filter(code=code).first()
+        inv = EventInvitation.objects.select_for_update().filter(code=code).first()
+        if not inv or not inv.is_valid_code:
+            return Response({"detail": "Invalid or expired invitation"}, status=400)
 
-        if inv.is_one_use:
-            inv.is_used = True
-            inv.save(update_fields=["is_used"])
+        event = inv.event
+        # limit miejsc
         
-        EventParticipant.objects.get_or_create(
-            user=user,
-            event=inv.event,
-            role='participant',
+        add = getattr(event, 'additional_info', None)
+        if add and add.places_for_people_limit:
+            current = EventParticipant.objects.select_for_update().filter(event=event).count()
+            if current >= add.places_for_people_limit:
+                return Response({"detail": "No seats available"}, status=409)
+
+        obj, created = EventParticipant.objects.get_or_create(
+            user=request.user, event=event, defaults={'role': 'participant'}
         )
 
-        return Response("success", status=status.HTTP_200_OK)
+        if inv.is_one_use:
+            if inv.is_used:
+                return Response({"detail": "Invitation already used"}, status=409)
+            inv.is_used = True
+            inv.save(update_fields=["is_used"])
+
+        return Response({"status": "success"}, status=200)

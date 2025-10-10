@@ -79,7 +79,7 @@ class EventParticipant(models.Model):
 
     role = models.CharField(max_length=255, choices=PARTICIPANT_ROLES, default='participant')
     paid_status = models.BooleanField(default=False)
-    presense = models.BooleanField(null=True, default=True)
+    presence = models.BooleanField(null=True, default=True)
 
     class Meta:
         constraints = [

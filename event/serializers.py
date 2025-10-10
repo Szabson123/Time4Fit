@@ -5,6 +5,7 @@ from user_profile.models import UserProfile
 from user.models import CentralUser
 import random, string
 from decimal import Decimal
+from django.db import transaction
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -64,15 +65,18 @@ class EventSerializer(serializers.ModelSerializer):
         if value < timezone.now():
             raise serializers.ValidationError("You cant create event in the past")
         return value
-        
+    
+    @transaction.atomic
     def create(self, validated_data):
         additional_info_data = validated_data.pop("additional_info")
 
         event = Event.objects.create(**validated_data)
-        EventAdditionalInfoSerializer().create({
+        add_ser = EventAdditionalInfoSerializer().create({
             **additional_info_data,
             "event": event
         })
+        add_ser.is_valid(raise_exception=True)
+        add_ser.save()
 
         return event
     
@@ -130,7 +134,7 @@ class EventParticipantSerializer(serializers.ModelSerializer):
     user = UserEventParticipantSerializer(read_only=True)
     class Meta:
         model = EventParticipant
-        fields = ['id', 'user', 'role', 'paid_status', 'presense']
+        fields = ['id', 'user', 'role', 'paid_status', 'presence']
 
 
 class EventInvitationSerializer(serializers.ModelSerializer):

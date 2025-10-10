@@ -28,7 +28,7 @@ def test_event_create(auth_client):
             "places_for_people_limit": 10,
             "age_limit": "string",
             "participant_list_show": True,
-            "free": True,
+            "price": "0.00",
             "payment_in_app": True,
             "special_guests": [
             {

@@ -29,8 +29,9 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         guest_data = validated_data.pop("special_guests", [])
-        add_info = EventAdditionalInfo.objects.create(**validated_data)
-
+        event = self.context.get("event")
+        add_info = EventAdditionalInfo.objects.create(event=event, **validated_data)
+    
         for guest in guest_data:
             SpecialGuests.objects.create(add_info=add_info, **guest)
         
@@ -72,7 +73,7 @@ class EventSerializer(serializers.ModelSerializer):
         additional_info_data = validated_data.pop("additional_info")
         event = Event.objects.create(**validated_data)
 
-        info_ser = EventAdditionalInfoSerializer(data={**additional_info_data, "event": event})
+        info_ser = EventAdditionalInfoSerializer(data=additional_info_data, context={'event': event})
         info_ser.is_valid(raise_exception=True)
         info_ser.save()
 

@@ -17,7 +17,7 @@ from .serializers import( EventSerializer, EventInvitationCreateSerializer, Even
                           ChangeRoleSerializer)
 
 from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES
-from .permissions import IsEventAuthor
+from .permissions import IsEventAuthor, IsAuthorOrReadOnly
 
 
 class CustomPagination(PageNumberPagination):
@@ -27,7 +27,7 @@ class CustomPagination(PageNumberPagination):
 
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
     pagination_class = CustomPagination
 
     def get_serializer_class(self):
@@ -41,8 +41,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-
-        base_qs = Event.objects.select_related('category', 'additional_info')
+        base_qs = Event.objects.select_related('category', 'additional_info').order_by('date_time_event')
 
         if self.action == "list":
             return (

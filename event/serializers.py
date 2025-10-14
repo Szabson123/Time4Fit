@@ -25,7 +25,10 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
 
         model = EventAdditionalInfo
         fields = ['advanced_level', 'places_for_people_limit', 'age_limit', 'price', 'payment_in_app', 'special_guests']
-
+    
+    def validate(self, attrs):
+        
+        return super().validate(attrs)
     
     def create(self, validated_data):
         guest_data = validated_data.pop("special_guests", [])
@@ -111,11 +114,11 @@ class EventListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Event
-        fields = ['id', 'date_time_event', 'title', 'short_desc', 'category_name', 'additional_info', 'event_participant_count']
-    
+        fields = ['id', 'date_time_event', 'title', 'short_desc', 'category_name', 'event_participant_count',
+                  'country', 'city', 'street', 'street_number', 'flat_number', 'additional_info']
+        
     def get_category_name(self, obj):
         return obj.category.name if obj.category else None
-
 
 class ProfileEventParticipantSerializer(serializers.ModelSerializer):
     class Meta:

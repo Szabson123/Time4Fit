@@ -211,3 +211,9 @@ class NoneSerializer(serializers.Serializer):
 
 class ChangeRoleSerializer(serializers.Serializer):
     new_role = serializers.CharField(required=True)
+
+
+class EventMapSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Event
+        fields = ['id', 'latitude', 'longitude']

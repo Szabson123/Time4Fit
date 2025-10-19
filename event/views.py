@@ -8,13 +8,13 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListAPIView, CreateAPIView, GenericAPIView
 from rest_framework.exceptions import PermissionDenied
 
 from .serializers import( EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CodeSerializer,
                           CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer, NoneSerializer,
-                          ChangeRoleSerializer)
+                          ChangeRoleSerializer, EventMapSerializer)
 
 from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES
 from .permissions import IsEventAuthor, IsAuthorOrReadOnly
@@ -26,14 +26,14 @@ class CustomPagination(PageNumberPagination):
 
 
 class EventViewSet(viewsets.ModelViewSet):
-    serializer_class = EventSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
     pagination_class = CustomPagination
 
     def get_serializer_class(self):
         if self.action == "list":
             return EventListSerializer
-        
+        elif self.action == "events_on_map":
+            return EventMapSerializer
         return EventSerializer
 
     def perform_create(self, serializer):
@@ -63,6 +63,12 @@ class EventViewSet(viewsets.ModelViewSet):
             )
 
         return base_qs.filter(author=user)
+    
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    def events_on_map(self, request, *args, **kwargs):
+        queryset = Event.objects.filter(public_event=True, date_time_event__gte=timezone.now())
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class CategoryListView(ListAPIView):

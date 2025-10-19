@@ -26,16 +26,16 @@ class CustomPagination(PageNumberPagination):
 
 
 class EventViewSet(viewsets.ModelViewSet):
+    serializer_class = EventSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
     pagination_class = CustomPagination
 
     def get_serializer_class(self):
         if self.action == "list":
             return EventListSerializer
-        elif self.action == "events_on_map":
-            return EventMapSerializer
-        return EventSerializer
-
+        
+        return super().get_serializer_class()
+    
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
@@ -64,7 +64,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
         return base_qs.filter(author=user)
     
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], serializer_class=EventMapSerializer)
     def events_on_map(self, request, *args, **kwargs):
         queryset = Event.objects.filter(public_event=True, date_time_event__gte=timezone.now())
         serializer = self.get_serializer(queryset, many=True)
@@ -141,10 +141,7 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
     def get_serializer_class(self):
         if self.action == 'list':
             return EventInvitationSerializer
-        elif self.action == 'deactivate' or self.action == 'activate':
-            return NoneSerializer
-        
-        return EventInvitationCreateSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
         user = self.request.user
@@ -168,7 +165,7 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         
         serializer.save(created_by=self.request.user, event=event)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsEventAuthor])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsEventAuthor], serializer_class=NoneSerializer)
     def deactivate(self, request, pk=None, *args, **kwargs):
         invitation = self.get_object()
         invitation.is_active = False
@@ -178,7 +175,7 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
             {"status": "deactivated", "invitation_id": invitation.id}
         )
     
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsEventAuthor])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated, IsEventAuthor], serializer_class=NoneSerializer)
     def activate(self, request, pk=None, *args, **kwargs):
         invitation = self.get_object()
         invitation.is_active = True

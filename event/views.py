@@ -33,8 +33,14 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "list":
             return EventListSerializer
-        
         return super().get_serializer_class()
+    
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            self.permission_classes = [AllowAny]
+        else:
+            self.permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
+        return super().get_permissions()
     
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -86,11 +92,8 @@ class EventParticipantList(ListAPIView):
         event_id = self.kwargs.get('event_id')
         event = get_object_or_404(Event, pk=event_id)
 
-        if user == event.author:
-            return EventParticipant.objects.filter(event=event)
-
-        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
-            return EventParticipant.objects.filter(event=event)
+        if user == event.author or EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
+            return EventParticipant.objects.select_related('event').filter(event=event)
 
         raise PermissionDenied(detail="You don't have permissions")
     
@@ -148,12 +151,9 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         event_id = self.kwargs.get('event_id')
         event = get_object_or_404(Event, pk=event_id)
 
-        if user == event.author:
-            return EventInvitation.objects.select_related("event").filter(event=event)
+        if user == event.author or EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
+            return EventParticipant.objects.select_related('event').filter(event=event)
 
-        if EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
-            return EventInvitation.objects.select_related("event").filter(event=event)
-        
         raise PermissionDenied(detail="You don't have permissions")
 
     def perform_create(self, serializer):

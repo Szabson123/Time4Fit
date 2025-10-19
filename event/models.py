@@ -64,8 +64,9 @@ class EventAdditionalInfo(models.Model):
 
 class SpecialGuests(models.Model):
     add_info = models.ForeignKey(EventAdditionalInfo, on_delete=models.CASCADE, related_name='special_guests')
-    name = models.CharField(max_length=255)
-    surname = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    surname = models.CharField(max_length=255, null=True, blank=True)
+    nickname = models.CharField(max_length=255, null=True, blank=True)
 
 
 class EventParticipant(models.Model):

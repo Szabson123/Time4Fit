@@ -16,7 +16,7 @@ class CategorySerializer(serializers.ModelSerializer):
 class SpecialGuestSerializer(serializers.ModelSerializer):
     class Meta:
         model = SpecialGuests
-        fields = ['id', 'name', 'surname']
+        fields = ['id', 'name', 'surname', 'nickname']
 
 
 class EventAdditionalInfoSerializer(serializers.ModelSerializer):

@@ -61,8 +61,8 @@ class EventViewSet(viewsets.ModelViewSet):
                 base_qs
                 .filter(
                     Q(public_event=True) |
-                    Q(eventparticipant__user=user) 
-                    # Q(author=user)
+                    Q(eventparticipant__user=user) |
+                    Q(author=user)
                 )
                 .annotate(event_participant_count=Count('eventparticipant'))
                 .distinct()

@@ -1,0 +1,19 @@
+latest() rzuci DoesNotExist, jeśli brak danych
+first() rzuci None
+
+  last_production = (
+      LastProductOnPlace.objects
+      .filter(product_process=process, place=place)
+      .order_by('-date')
+      .first()
+  )
+
+Od dziś niew wolno:
+obj.counter += 1
+obj.save()
+
+Pracujemy na F czyli polu bazy danych:
+
+Model.objects.filter(id=obj.id).update(
+    counter=F('counter') + 1
+)

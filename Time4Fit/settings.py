@@ -33,12 +33,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -73,6 +72,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://time4fit.netlify.app"
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://time4fit.netlify.app",
+]
 
 DATABASES = {
     'default': {

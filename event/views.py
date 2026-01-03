@@ -193,7 +193,7 @@ class InvGetInfoOfEvent(GenericAPIView):
 
         inv = EventInvitation.objects.filter(code=code).first()
 
-        if not inv or not inv.is_valid_code:
+        if not inv or not inv.is_valid:
             return Response({"error": "Invalid or expired invitation"}, status=status.HTTP_400_BAD_REQUEST)
         
         event = (
@@ -218,7 +218,7 @@ class InvGetIntoEvent(GenericAPIView):
         code = ser.validated_data['code']
 
         inv = EventInvitation.objects.select_for_update().filter(code=code).first()
-        if not inv or not inv.is_valid_code:
+        if not inv or not inv.is_valid:
             return Response({"detail": "Invalid or expired invitation"}, status=status.HTTP_400_BAD_REQUEST)
 
         event = inv.event

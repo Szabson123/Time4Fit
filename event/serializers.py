@@ -199,7 +199,7 @@ class CodeSerializer(serializers.Serializer):
         except EventInvitation.DoesNotExist:
             raise serializers.ValidationError("Invalid invitation code.")
 
-        if not inv.is_valid_code:
+        if not inv.is_valid:
             raise serializers.ValidationError("Invitation expired or inactive.")
 
         return value

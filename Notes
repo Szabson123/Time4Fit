@@ -17,3 +17,18 @@ Pracujemy na F czyli polu bazy danych:
 Model.objects.filter(id=obj.id).update(
     counter=F('counter') + 1
 )
+
+# Kiedy mamay więcej akcji można użyć mapy
+
+permission_map = {
+    "list": HasPermCanSeeAdminPage,
+    "retrieve": HasPermCanSeeAdminPage,
+    "create": HasPermCanUpdateAdminPage,
+    "update": HasPermCanUpdateAdminPage,
+    "partial_update": HasPermCanUpdateAdminPage,
+    "destroy": HasPermCanUpdateAdminPage,
+}
+
+def get_permissions(self):
+    perm = self.permission_map.get(self.action, HasPermCanUpdateAdminPage)
+    return [perm()]

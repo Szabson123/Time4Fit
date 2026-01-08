@@ -32,3 +32,12 @@ permission_map = {
 def get_permissions(self):
     perm = self.permission_map.get(self.action, HasPermCanUpdateAdminPage)
     return [perm()]
+
+#Lub tak
+def get_permissions(self):
+    if self.action in ("list", "retrieve"):
+        permission_classes = [HasPermCanSeeAdminPage]
+    else:
+        permission_classes = [HasPermCanUpdateAdminPage]
+
+    return [perm() for perm in permission_classes]

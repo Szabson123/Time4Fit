@@ -89,7 +89,7 @@ class EventParticipant(models.Model):
 class EventInvitation(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='eventinvitation')
     code = models.CharField(max_length=8, unique=True)
-    date_added = models.DateField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
     is_one_use = models.BooleanField(default=False)
     is_used = models.BooleanField(default=False)

@@ -2,7 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-
+from user_profile.models import UserProfile
 CentralUser = get_user_model()
 
 @pytest.fixture
@@ -11,12 +11,19 @@ def api_client():
 
 @pytest.fixture
 def central_user(db):
-    return CentralUser.objects.create_user(
+    user = CentralUser.objects.create_user(
         email="test@test.com",
         password="password123",
         is_active=True,
         is_user_activated=True,
     )
+    profile = UserProfile.objects.create(
+        name='aaa',
+        surname='surname',
+        user=user,
+    )
+
+    return user
 
 
 @pytest.fixture

@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.db.models import Q, Count
 from django.utils import timezone
 from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework import viewsets, status, mixins
 from rest_framework.pagination import PageNumberPagination
@@ -11,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.generics import ListAPIView, CreateAPIView, GenericAPIView
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.throttling import UserRateThrottle
 
 from .serializers import( EventSerializer, EventInvitationCreateSerializer, EventListSerializer, CodeSerializer,
                           CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer, NoneSerializer,
@@ -23,6 +25,9 @@ from .permissions import IsEventAuthor, IsAuthorOrReadOnly
 class CustomPagination(PageNumberPagination):
     page_size = 20
     max_page_size = 60
+
+class TenPerMinuteThrottle(UserRateThrottle):
+    rate = '10/min'
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -75,6 +80,16 @@ class EventViewSet(viewsets.ModelViewSet):
         queryset = Event.objects.filter(public_event=True, date_time_event__gte=timezone.now())
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], serializer_class=EventSerializer, throttle_classes = [TenPerMinuteThrottle], url_path=r'by-code/(?P<access_code>[^/.]+)')
+    def get_event_with_code(self, request, *args, **kwargs):
+        access_code = self.kwargs.get('access_code')
+        try:
+            event = Event.objects.filter(eventinvitation__code=access_code).latest('date_time_event')
+        except Event.DoesNotExist:
+            return Response({"error": "Event didnt found", "code": "event_does_not_exist"})
+        serializer = self.get_serializer(event, many=False)
+        return Response(serializer.data)
 
 
 class CategoryListView(ListAPIView):
@@ -118,12 +133,12 @@ class ChangeUserRankInEvent(GenericAPIView):
             new_role = serializer.validated_data['new_role']
 
             if new_role == participant.role:
-                return Response({"detail": "Already has this role."}, status=status.HTTP_200_OK)
+                return Response({"error": "Already has this role", "code": "role_aleardy_assigned"}, status=status.HTTP_200_OK)
             
             VALID_ROLES = [r[0] for r in PARTICIPANT_ROLES]
 
             if new_role not in VALID_ROLES:
-                return Response({"detail": "This role doesn't exist."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "This role doesn't exist", "code": "role_didnt_found"}, status=status.HTTP_400_BAD_REQUEST)
             
             participant.role = new_role
             participant.save(update_fields=["role"])
@@ -134,7 +149,7 @@ class ChangeUserRankInEvent(GenericAPIView):
             })
         
         else:
-            raise PermissionDenied(detail="You don't have permissions")
+            raise PermissionDenied({"error": "You don't have permissions to invite users to this event", "code": "no_permissions"})
 
 
 class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -152,16 +167,16 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         event = get_object_or_404(Event, pk=event_id)
 
         if user == event.author or EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
-            return EventParticipant.objects.select_related('event').filter(event=event)
+            return EventInvitation.objects.select_related('event').filter(event=event)
 
-        raise PermissionDenied(detail="You don't have permissions")
+        raise PermissionDenied({"error": "You don't have permissions to invite users to this event", "code": "no_permissions"})
 
     def perform_create(self, serializer):
         event_id = self.kwargs.get('event_id')
         event = get_object_or_404(Event, pk=event_id)
 
         if event.author != self.request.user:
-            raise PermissionDenied(detail="You don't have permissions to invite users to this event.")
+            raise PermissionDenied({"error": "You don't have permissions to invite users to this event", "code": "no_permissions"})
         
         serializer.save(created_by=self.request.user, event=event)
 
@@ -219,7 +234,7 @@ class InvGetIntoEvent(GenericAPIView):
 
         inv = EventInvitation.objects.select_for_update().filter(code=code).first()
         if not inv or not inv.is_valid:
-            return Response({"detail": "Invalid or expired invitation"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Invalid or expired invitation", "code": "invalid_invitation_code"}, status=status.HTTP_400_BAD_REQUEST)
 
         event = inv.event
         # limit miejsc

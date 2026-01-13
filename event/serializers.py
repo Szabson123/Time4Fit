@@ -57,11 +57,12 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     additional_info = EventAdditionalInfoSerializer()
     event_participant_count = serializers.IntegerField(read_only=True)
+    author_full_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         read_only_fields = ['unique_id', 'author']
-        fields = ['id', 'unique_id', 'author', 'title', 'category', 'short_desc', 'long_desc', 'date_time_event', 'duration_min',
+        fields = ['id', 'unique_id', 'author', 'author_full_name', 'title', 'category', 'short_desc', 'long_desc', 'date_time_event', 'duration_min',
                 'latitude', 'longitude', 'public_event',
                 'country', 'city', 'street', 'street_number', 'flat_number', 'zip_code', 'event_participant_count',
                 'additional_info']
@@ -70,6 +71,12 @@ class EventSerializer(serializers.ModelSerializer):
         if value < timezone.now():
             raise serializers.ValidationError("You cant create event in the past")
         return value
+    
+    def get_author_full_name(self, obj):
+        author = obj.author
+        if not author:
+            return None
+        return f"{author.profile.name} {author.profile.surname}"
     
     @transaction.atomic
     def create(self, validated_data):
@@ -145,7 +152,7 @@ class EventInvitationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = EventInvitation
-        fields = ['id', 'code', 'date_added', 'is_one_use', 'is_valid', 'link']
+        fields = ['id', 'code', 'created_at', 'is_one_use', 'is_valid', 'link']
 
 
 class EventInvitationCreateSerializer(serializers.ModelSerializer):

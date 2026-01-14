@@ -142,3 +142,14 @@ def test_private_event_see_details_author(auth_api_client, event_factory, user_f
     response = client.get(url, format="json")
     assert response.status_code == 200, f"Otrzymano błąd walidacji {response.data}"
     # print(response.data)
+
+@pytest.mark.django_db
+def test_creating_inv_in_event_author(auth_api_client, event_factory, user_factory):
+    client, user = auth_api_client
+    event = event_factory(author=user, public_event=False)
+
+    url = f'/event/events/{event.id}/invitations/'
+
+    payload = {
+
+    }

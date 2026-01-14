@@ -28,6 +28,9 @@ PARTICIPANT_ROLES = [
 class Category(models.Model):
     name = models.CharField(max_length=255)
 
+    def __str__(self):
+        return self.name
+
 
 class Event(models.Model):
     unique_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
@@ -52,6 +55,9 @@ class Event(models.Model):
     zip_code = models.CharField(max_length=255, blank=True, null=True)
     public_event = models.BooleanField(default=True)
 
+    def __str__(self):
+        return self.title
+    
 
 class EventAdditionalInfo(models.Model):
     event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="additional_info")
@@ -88,7 +94,7 @@ class EventParticipant(models.Model):
 
 class EventInvitation(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='eventinvitation')
-    code = models.CharField(max_length=8, unique=True)
+    code = models.CharField(max_length=8, unique=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
     is_one_use = models.BooleanField(default=False)

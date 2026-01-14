@@ -56,21 +56,22 @@ class EventViewSet(viewsets.ModelViewSet):
         user = self.request.user
         base_qs = Event.objects.select_related('category', 'additional_info').order_by('date_time_event')
 
+        filters = Q(public_event=True)
+        if user.is_authenticated:
+            filters |= Q(author=user)
+            filters |= Q(eventparticipant__user=user)
+
         if self.action == "list":
             return (
                 base_qs
-                .filter(public_event=True, date_time_event__gte=timezone.now())
+                .filter(filters, date_time_event__gte=timezone.now())
                 .annotate(event_participant_count=Count('eventparticipant'))
             )
 
         if self.action == "retrieve":
             return (
                 base_qs
-                .filter(
-                    Q(public_event=True) |
-                    Q(eventparticipant__user=user) |
-                    Q(author=user)
-                )
+                .filter(filters,date_time_event__gte=timezone.now())
                 .annotate(event_participant_count=Count('eventparticipant'))
                 .distinct()
             )
@@ -87,7 +88,13 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_event_with_code(self, request, *args, **kwargs):
         access_code = self.kwargs.get('access_code')
         try:
-            event = Event.objects.filter(eventinvitation__code=access_code).latest('date_time_event')
+            event = Event.objects.filter(
+                eventinvitation__code=access_code,
+                eventinvitation__is_active=True,
+                eventinvitation__is_used=False,
+                date_time_event__gte=timezone.now()
+            ).latest('date_time_event')
+            
         except Event.DoesNotExist:
             return Response({"error": "Event didnt found", "code": "event_does_not_exist"})
         serializer = self.get_serializer(event, many=False)

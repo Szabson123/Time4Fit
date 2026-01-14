@@ -1,40 +1,21 @@
 import pytest
 from rest_framework.test import APIClient
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-from user_profile.models import UserProfile
-CentralUser = get_user_model()
+
 
 @pytest.fixture
 def api_client():
     return APIClient()
 
-@pytest.fixture
-def central_user(db):
-    user = CentralUser.objects.create_user(
-        email="test@test.com",
-        password="password123",
-        is_active=True,
-        is_user_activated=True,
-    )
-    profile = UserProfile.objects.create(
-        name='aaa',
-        surname='surname',
-        user=user,
-    )
-
-    return user
-
 
 @pytest.fixture
-def jwt_token(central_user):
-    refresh = RefreshToken.for_user(central_user)
-    return str(refresh.access_token)
+def auth_api_client(api_client, user_factory):
+    user = user_factory()
+    api_client.force_authenticate(user=user)
+    return api_client, user
 
-
-@pytest.fixture
-def auth_api_client(api_client, jwt_token):
-    api_client.credentials(
-        HTTP_AUTHORIZATION=f"Bearer {jwt_token}"
-    )
-    return api_client
+@pytest.fixture(autouse=True)
+def use_fast_password_hasher(settings):
+    """Wymusza użycie szybkiego haszowania haseł w testach."""
+    settings.PASSWORD_HASHERS = [
+        "django.contrib.auth.hashers.MD5PasswordHasher",
+    ]

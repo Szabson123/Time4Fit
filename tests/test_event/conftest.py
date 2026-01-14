@@ -1,6 +1,8 @@
 from django.utils import timezone
 from datetime import timedelta
 import pytest
+from .factories import EventFactory, UserFactory
+from pytest_factoryboy import register
 
 @pytest.fixture
 def event_payload_factory():
@@ -39,3 +41,7 @@ def event_payload_factory():
         payload.update(overrides)
         return payload
     return factory
+
+
+register(EventFactory)
+register(UserFactory)

@@ -20,6 +20,7 @@ from .serializers import( EventSerializer, EventInvitationCreateSerializer, Even
 
 from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES
 from .permissions import IsEventAuthor, IsAuthorOrReadOnly
+from .filters import EventListFilter
 
 
 class CustomPagination(PageNumberPagination):
@@ -34,6 +35,7 @@ class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
     pagination_class = CustomPagination
+    filterset_class = EventListFilter
 
     def get_serializer_class(self):
         if self.action == "list":

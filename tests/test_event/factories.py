@@ -3,7 +3,7 @@ from factory.django import DjangoModelFactory
 from django.utils import timezone
 from datetime import timedelta
 import pytest
-from event.models import Event, EventInvitation
+from event.models import Event, EventInvitation, EventParticipant
 from user.models import CentralUser
 from user_profile.models import UserProfile
 
@@ -56,3 +56,12 @@ class EventFactory(DjangoModelFactory):
     street_number = "50"
     flat_number = "10"
     zip_code = "41-215"
+
+
+class EventParticipantFactory(DjangoModelFactory):
+    class Meta:
+        model = EventParticipant
+
+    role = 'participant'
+    paid_status = False
+    presence = False

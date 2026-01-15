@@ -5,6 +5,7 @@ from event.models import Event, EventInvitation
 from .factories import EventFactory
 import threading
 from django.db import connections
+from rest_framework.test import APIClient
 
 
 @pytest.mark.django_db()
@@ -236,37 +237,106 @@ def test_get_access_to_event_with_access_code(api_client, event_factory, event_i
     assert response.status_code == 401, f"Blad {response.data}"
 
 @pytest.mark.django_db(transaction=True)
-def test_two_users_use_same_invitation_code_at_the_same_time(auth_api_client, event_factory, event_invitation_factory, user_factory):
-    user_author = user_factory()
-    event = event_factory(author=user_author, public_event=False, title="Testowo")
-    inv = event_invitation_factory(event=event, created_by=user_author, is_one_use=True)
+def test_two_users_use_same_invitation_code_at_the_same_time(event_factory, event_invitation_factory, user_factory):
+    author = user_factory()
+    event = event_factory(author=author, public_event=False)
 
-    client1, user1 = auth_api_client 
-    client2, user2  = auth_api_client
+    invitation = event_invitation_factory(
+        event=event,
+        created_by=author,
+        is_one_use=True
+    )
 
-    url = f'/event/event-inv-join/'
+    user1 = user_factory()
+    user2 = user_factory()
+
+    client1 = APIClient()
+    client1.force_authenticate(user=user1)
+
+    client2 = APIClient()
+    client2.force_authenticate(user=user2)
+
+    url = '/event/event-inv-join/'
 
     payload = {
-        "code": inv.code
+        "code": invitation.code
     }
 
     results = []
+    barrier = threading.Barrier(2)
 
-    def make_request(user, client):
-        try:            
-            response = client.post(url, payload)
+    def make_request(client):
+        try:
+            barrier.wait()
+            response = client.post(url, payload, format="json")
             results.append(response.status_code)
         finally:
-            connections.close_all()
+            connections.close_all() 
 
-    t1 = threading.Thread(target=make_request, args=(user1, client1))
-    t2 = threading.Thread(target=make_request, args=(user2, client2))
+    t1 = threading.Thread(target=make_request, args=(client1,))
+    t2 = threading.Thread(target=make_request, args=(client2,))
 
     t1.start()
     t2.start()
-
     t1.join()
     t2.join()
 
+    connections.close_all()
+
     assert sorted(results) == [200, 400]
+
+@pytest.mark.django_db
+def test_deleting_user_from_participant_list_happy_path(auth_api_client, event_factory, user_factory, event_participant_factory):
+    client, user = auth_api_client
+    event = event_factory(author=user, public_event=False)
+
+    user_participant = user_factory()
+    event_participant = event_participant_factory(
+        event=event,
+        user=user_participant
+    )
+
+    url = f'/event/{event.id}/event-participant-list/{event_participant.id}/delete_user_from_participant_list/'
+
+    response = client.post(url, format="json")
+    print(response)
+    assert response.status_code == 204
+
+@pytest.mark.django_db
+def test_deleting_user_from_participant_list_perm_denied(auth_api_client, event_factory, user_factory, event_participant_factory):
+    client, user = auth_api_client
+    random_user = user_factory()
+    event = event_factory(author=random_user, public_event=False)
+
+    user_participant = user_factory()
+    event_participant = event_participant_factory(
+        event=event,
+        user=user_participant
+    )
+
+    url = f'/event/{event.id}/event-participant-list/{event_participant.id}/delete_user_from_participant_list/'
+
+    response = client.post(url, format="json")
+    assert response.status_code == 403, f'blad {response.data}'
+
+@pytest.mark.django_db
+def test_author_can_kick_user_and_user_loses_access(auth_api_client, user_factory, event_factory, event_participant_factory):
+    client, author = auth_api_client
+
+    kicked_user = user_factory()
+    client2 = APIClient()
+    client2.force_authenticate(user=kicked_user)
+
+    event = event_factory(author=author, public_event=False)
+
+    event_participant = event_participant_factory(event=event, user=kicked_user)
+
+    url = f'/event/{event.id}/event-participant-list/{event_participant.id}/delete_user_from_participant_list/'
+
+    response = client.post(url)
+    assert response.status_code == 204
+
+    event_url = f'/event/events/{event.id}/'
+    response = client2.get(event_url)
+    assert response.status_code == 404
 

@@ -54,7 +54,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        base_qs = Event.objects.select_related('category', 'additional_info').order_by('date_time_event')
+        base_qs = Event.objects.select_related('category', 'additional_info').prefetch_related('eventparticipant__user__profile').order_by('date_time_event')
 
         filters = Q(public_event=True)
         if user.is_authenticated:
@@ -107,7 +107,7 @@ class CategoryListView(ListAPIView):
     permission_classes = [IsAuthenticated]
 
 
-class EventParticipantList(ListAPIView):
+class EventParticipantList(mixins.ListModelMixin, viewsets.GenericViewSet):
     serializer_class = EventParticipantSerializer
     permission_classes = [IsAuthenticated]
 
@@ -120,6 +120,12 @@ class EventParticipantList(ListAPIView):
             return EventParticipant.objects.select_related('event').filter(event=event)
 
         raise PermissionDenied(detail="You don't have permissions")
+    
+    @action(detail=True, permission_classes=[IsEventAuthor], methods=['post'])
+    def delete_user_from_participant_list(self, request, *args, **kwargs):
+        participant = self.get_object()
+        participant.delete()
+        return Response({"detail": "User has been removed from list"}, status=status.HTTP_204_NO_CONTENT)
     
 
 class ChangeUserRankInEvent(GenericAPIView):

@@ -1,7 +1,7 @@
 from django.utils import timezone
 from datetime import timedelta
 import pytest
-from .factories import EventFactory, UserFactory, EventInvitationFactory
+from .factories import EventFactory, UserFactory, EventInvitationFactory, EventParticipantFactory
 from pytest_factoryboy import register
 
 @pytest.fixture
@@ -46,3 +46,4 @@ def event_payload_factory():
 register(EventFactory)
 register(UserFactory)
 register(EventInvitationFactory)
+register(EventParticipantFactory)

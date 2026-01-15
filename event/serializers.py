@@ -13,10 +13,23 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name']
 
 
+class ProfileEventParticipantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['name', 'surname', 'phone_number', 'profile_picture']
+
+
 class SpecialGuestSerializer(serializers.ModelSerializer):
     class Meta:
         model = SpecialGuests
         fields = ['id', 'name', 'surname', 'nickname']
+
+
+class UserEventParticipantSerializer(serializers.ModelSerializer):
+    profile = ProfileEventParticipantSerializer(read_only=True)
+    class Meta:
+        model = CentralUser
+        fields = ['id', 'email', 'profile']
 
 
 class EventAdditionalInfoSerializer(serializers.ModelSerializer):
@@ -52,12 +65,20 @@ class EventAdditionalInfoSerializer(serializers.ModelSerializer):
                 SpecialGuests.objects.create(add_info=instance, **guest)
 
         return instance
+    
+
+class EventParticipantSerializer(serializers.ModelSerializer):
+    user = UserEventParticipantSerializer(read_only=True)
+    class Meta:
+        model = EventParticipant
+        fields = ['id', 'user', 'role', 'paid_status', 'presence']
 
 
 class EventSerializer(serializers.ModelSerializer):
     additional_info = EventAdditionalInfoSerializer()
     event_participant_count = serializers.IntegerField(read_only=True)
     author_full_name = serializers.SerializerMethodField()
+    trainer_list = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
@@ -65,7 +86,7 @@ class EventSerializer(serializers.ModelSerializer):
         fields = ['id', 'unique_id', 'author', 'author_full_name', 'title', 'category', 'short_desc', 'long_desc', 'date_time_event', 'duration_min',
                 'latitude', 'longitude', 'public_event',
                 'country', 'city', 'street', 'street_number', 'flat_number', 'zip_code', 'event_participant_count',
-                'additional_info']
+                'additional_info', 'trainer_list']
         
     def validate_date_time_event(self, value):
         if value < timezone.now():
@@ -77,6 +98,13 @@ class EventSerializer(serializers.ModelSerializer):
         if not author:
             return None
         return f"{author.profile.name} {author.profile.surname}"
+
+    def get_trainer_list(self, obj):
+        return EventParticipantSerializer(
+            obj.eventparticipant.filter(role='trainer'),
+            many=True,
+            context=self.context
+        ).data
     
     @transaction.atomic
     def create(self, validated_data):
@@ -126,25 +154,6 @@ class EventListSerializer(serializers.ModelSerializer):
         
     def get_category_name(self, obj):
         return obj.category.name if obj.category else None
-
-class ProfileEventParticipantSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserProfile
-        fields = ['name', 'surname', 'phone_number', 'profile_picture']
-
-
-class UserEventParticipantSerializer(serializers.ModelSerializer):
-    profile = ProfileEventParticipantSerializer(read_only=True)
-    class Meta:
-        model = CentralUser
-        fields = ['id', 'email', 'profile']
-
-
-class EventParticipantSerializer(serializers.ModelSerializer):
-    user = UserEventParticipantSerializer(read_only=True)
-    class Meta:
-        model = EventParticipant
-        fields = ['id', 'user', 'role', 'paid_status', 'presence']
 
 
 class EventInvitationSerializer(serializers.ModelSerializer):

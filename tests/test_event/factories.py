@@ -3,9 +3,18 @@ from factory.django import DjangoModelFactory
 from django.utils import timezone
 from datetime import timedelta
 import pytest
-from event.models import Event
+from event.models import Event, EventInvitation
 from user.models import CentralUser
 from user_profile.models import UserProfile
+
+
+class EventInvitationFactory(DjangoModelFactory):
+    class Meta:
+        model = EventInvitation
+
+    is_one_use = False
+    is_active = True
+    code = 'F67B1234'
 
 
 class UserFactory(DjangoModelFactory):

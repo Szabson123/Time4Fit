@@ -1,8 +1,10 @@
 import pytest
 from django.utils import timezone
 from datetime import timedelta
-from event.models import Event
+from event.models import Event, EventInvitation
 from .factories import EventFactory
+import threading
+from django.db import connections
 
 
 @pytest.mark.django_db()
@@ -151,5 +153,120 @@ def test_creating_inv_in_event_author(auth_api_client, event_factory, user_facto
     url = f'/event/events/{event.id}/invitations/'
 
     payload = {
-
+        "is_one_use": True,
+        "is_active": True
     }
+
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 201, f"Blad {response.data}"
+    inv = EventInvitation.objects.get()
+    assert len(inv.code) == 8
+    assert inv.is_active == True
+    assert inv.is_one_use == True
+
+@pytest.mark.django_db
+def test_get_access_to_event_with_access_code(auth_api_client, event_factory, event_invitation_factory, user_factory):
+    client, user = auth_api_client
+    user_author = user_factory()
+    event = event_factory(author=user_author, public_event=False, title="Testowo")
+    inv = event_invitation_factory(event=event, created_by=user_author)
+
+    access_code = inv.code
+    url = f'/event/events/by-code/{access_code}/'
+
+    response = client.get(url, format='json')
+    assert response.status_code == 200, f"Blad {response.data}"
+    event = Event.objects.get()
+    assert event.title == "Testowo"
+
+@pytest.mark.django_db
+def test_get_access_to_event_with_access_code_bad_access(auth_api_client, event_factory, event_invitation_factory, user_factory):
+    client, user = auth_api_client
+    user_author = user_factory()
+    event = event_factory(author=user_author, public_event=False, title="Testowo")
+    inv = event_invitation_factory(event=event, created_by=user_author)
+
+    access_code = 'BAS12345'
+    url = f'/event/events/by-code/{access_code}/'
+
+    response = client.get(url, format='json')
+    assert response.status_code == 404, f"Blad {response.data}"
+
+@pytest.mark.django_db
+def test_get_access_to_event_with_access_code_code_used(auth_api_client, event_factory, event_invitation_factory, user_factory):
+    client, user = auth_api_client
+    user_author = user_factory()
+    event = event_factory(author=user_author, public_event=False, title="Testowo")
+    inv = event_invitation_factory(event=event, created_by=user_author, is_active=False)
+
+    access_code = inv.code
+    url = f'/event/events/by-code/{access_code}/'
+
+    response = client.get(url, format='json')
+    assert response.status_code == 404, f"Blad {response.data}"
+
+@pytest.mark.django_db
+def test_no_author_try_create_inv(auth_api_client, event_factory, event_invitation_factory, user_factory):
+    client, user = auth_api_client
+    user_author = user_factory()
+    event = event_factory(author=user_author, public_event=False, title="Testowo")
+
+    url = f'/event/events/{event.id}/invitations/'
+
+    payload = {
+        "is_one_use": True,
+        "is_active": True
+    }
+
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 403, f"Blad {response.data}"
+    inv = EventInvitation.objects.all()
+    assert len(inv) == 0
+
+@pytest.mark.django_db
+def test_get_access_to_event_with_access_code(api_client, event_factory, event_invitation_factory, user_factory):
+    user_author = user_factory()
+    event = event_factory(author=user_author, public_event=False, title="Testowo")
+    inv = event_invitation_factory(event=event, created_by=user_author)
+
+    access_code = inv.code
+    url = f'/event/events/by-code/{access_code}/'
+
+    response = api_client.get(url, format='json')
+    assert response.status_code == 401, f"Blad {response.data}"
+
+@pytest.mark.django_db(transaction=True)
+def test_two_users_use_same_invitation_code_at_the_same_time(auth_api_client, event_factory, event_invitation_factory, user_factory):
+    user_author = user_factory()
+    event = event_factory(author=user_author, public_event=False, title="Testowo")
+    inv = event_invitation_factory(event=event, created_by=user_author, is_one_use=True)
+
+    client1, user1 = auth_api_client 
+    client2, user2  = auth_api_client
+
+    url = f'/event/event-inv-join/'
+
+    payload = {
+        "code": inv.code
+    }
+
+    results = []
+
+    def make_request(user, client):
+        try:            
+            response = client.post(url, payload)
+            results.append(response.status_code)
+        finally:
+            connections.close_all()
+
+    t1 = threading.Thread(target=make_request, args=(user1, client1))
+    t2 = threading.Thread(target=make_request, args=(user2, client2))
+
+    t1.start()
+    t2.start()
+
+    t1.join()
+    t2.join()
+
+    assert sorted(results) == [200, 400]
+

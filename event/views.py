@@ -96,7 +96,7 @@ class EventViewSet(viewsets.ModelViewSet):
             ).latest('date_time_event')
             
         except Event.DoesNotExist:
-            return Response({"error": "Event didnt found", "code": "event_does_not_exist"})
+            return Response({"error": "Event didnt found", "code": "event_does_not_exist"}, status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(event, many=False)
         return Response(serializer.data)
 
@@ -208,28 +208,6 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         return Response(
             {"status": "activate", "invitation_id": invitation.id}
         )
-
-
-class InvGetInfoOfEvent(GenericAPIView):
-    serializer_class = EventInvSerializer
-    def get(self, request, *args, **kwargs):
-        code = self.kwargs.get('inv_code')
-
-        inv = EventInvitation.objects.filter(code=code).first()
-
-        if not inv or not inv.is_valid:
-            return Response({"error": "Invalid or expired invitation"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        event = (
-            Event.objects
-            .annotate(event_participant_count=Count('eventparticipant'))
-            .select_related('author', 'additional_info', 'category')
-            .get(pk=inv.event.pk)
-        )
-
-        serializer = self.get_serializer(event)
-        return Response(serializer.data)
-    
 
 class InvGetIntoEvent(GenericAPIView):
     serializer_class = CodeSerializer

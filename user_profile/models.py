@@ -22,3 +22,27 @@ class UserProfile(models.Model):
     birth_day = models.DateField(null=True, blank=True)
     sex = models.CharField(max_length=255, choices=Sex_choices, default='none')
     profile_picture = models.ImageField(null=True, blank=True, upload_to="profile_pictures/")
+
+
+class TrainerProfile(models.Model):
+    profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE, related_name='trainerprofile')
+    description = models.CharField(max_length=2000, null=True, blank=True)
+    specializations = models.CharField(max_length=1000, null=True, blank=True)
+
+
+class CertyficationTrainer(models.Model):
+    trainer = models.ForeignKey(TrainerProfile, on_delete=models.CASCADE, related_name='certyficates')
+    title = models.CharField(max_length=255)
+    issued_by = models.CharField(max_length=255, null=True, blank=True)
+    identyficatior = models.CharField(max_length=50, null=True, blank=True)
+    issued_date = models.DateField()
+
+    # In the future
+    # file = 
+
+
+class TrainerPost(models.Model):
+    trainer = models.ForeignKey(TrainerProfile, on_delete=models.CASCADE, related_name='posts')
+    date = models.DateTimeField(auto_now_add=True)
+    description = models.CharField(max_length=2000)
+    

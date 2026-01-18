@@ -14,7 +14,7 @@ if not SECRET_KEY:
 ENV = os.getenv("ENV", "local")
 DEBUG = True
 
-ALLOWED_HOSTS = ["217.154.252.37", "127.0.0.1"]
+ALLOWED_HOSTS = ["217.154.252.37", "127.0.0.1", "time4test.fit"]
 FRONT_LINK = os.environ.get("FRONT_LINK", "http://localhost:5173/event/invite/")
 
 INSTALLED_APPS = [

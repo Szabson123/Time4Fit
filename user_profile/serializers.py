@@ -1,5 +1,12 @@
-from .models import PostImage, TrainerPost
+from .models import PostImage, TrainerPost, TrainerProfile
 from rest_framework import serializers
+
+
+class ProfileTrainerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TrainerProfile
+        fields = ['id', 'description', 'specializations', 'profile']
+        read_only_fields = ['profile']
 
 
 class PostImageSerializer(serializers.ModelSerializer):

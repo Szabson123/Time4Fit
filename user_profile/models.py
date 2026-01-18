@@ -45,4 +45,10 @@ class TrainerPost(models.Model):
     trainer = models.ForeignKey(TrainerProfile, on_delete=models.CASCADE, related_name='posts')
     date = models.DateTimeField(auto_now_add=True)
     description = models.CharField(max_length=2000)
+    likes = models.PositiveIntegerField(default=0)
+
+
+class PostImage(models.Model):
+    post = models.ForeignKey(TrainerPost, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='post_photos/')
     

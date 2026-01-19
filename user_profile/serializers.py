@@ -1,7 +1,13 @@
-from .models import PostImage, TrainerPost, TrainerProfile, CertificationFile, CertyficationTrainer
+from .models import PostImage, TrainerPost, TrainerProfile, CertificationFile, CertyficationTrainer, UserProfile
 from rest_framework import serializers
 from django.db import transaction
 from rest_framework.validators import ValidationError
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'name', 'surname', 'phone_number']
 
 
 class ProfileTrainerSerializer(serializers.ModelSerializer):
@@ -96,3 +102,11 @@ class CertyficationTrainerSerializer(serializers.ModelSerializer):
         return instance
 
 
+class TrainerFullProfileSerializer(serializers.Serializer):
+    description = serializers.CharField()
+    specializations = serializers.CharField()
+    profile = UserProfileSerializer()
+    email = serializers.CharField(source='profile.user.email', read_only=True)
+    event_past = serializers.IntegerField()
+    rate_avg = serializers.DecimalField(decimal_places=1, max_digits=2)
+    followers_count = serializers.IntegerField()

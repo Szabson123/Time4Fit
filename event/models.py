@@ -34,7 +34,7 @@ class Category(models.Model):
 
 class Event(models.Model):
     unique_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    author = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
+    author = models.ForeignKey(CentralUser, on_delete=models.CASCADE, related_name='events')
     title = models.CharField(max_length=255)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     short_desc = models.CharField(max_length=255)

@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import TrainerPostViewSet, ProfileTrainerViewSet
+from .views import TrainerPostViewSet, ProfileTrainerViewSet, TrainerFullProfileView
 
 
 router = DefaultRouter()
@@ -9,4 +9,5 @@ router.register(r'trainer-profiles', ProfileTrainerViewSet, basename='trainer-pr
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('trainer-full-profile/<int:trainer_id>/', TrainerFullProfileView.as_view(), name='trainer-full-profile')
 ]

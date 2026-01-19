@@ -63,7 +63,7 @@ class CertificationFileSerializer(serializers.ModelSerializer):
 
 class CertyficationTrainerSerializer(serializers.ModelSerializer):
     images = CertificationFileSerializer(many=True, read_only=True)
-    uploaded_images = serializers.ListSerializer(child=serializers.ImageField(allow_empty_file=True, use_url=False), write_only=True)
+    uploaded_images = serializers.ListField(child=serializers.ImageField(allow_empty_file=False, use_url=False),write_only=True)
 
     class Meta:
         model = CertyficationTrainer

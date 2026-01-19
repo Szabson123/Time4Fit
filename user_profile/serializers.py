@@ -1,12 +1,13 @@
-from .models import PostImage, TrainerPost, TrainerProfile
+from .models import PostImage, TrainerPost, TrainerProfile, CertificationFile, CertyficationTrainer
 from rest_framework import serializers
+from django.db import transaction
+from rest_framework.validators import ValidationError
 
 
 class ProfileTrainerSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainerProfile
-        fields = ['id', 'description', 'specializations', 'profile']
-        read_only_fields = ['profile']
+        fields = ['id', 'description', 'specializations']
 
 
 class PostImageSerializer(serializers.ModelSerializer):
@@ -34,16 +35,64 @@ class PostSerializer(serializers.ModelSerializer):
         return post
 
     def update(self, instance, validated_data):
-        images_data = validated_data.pop("images", [])
+        uploaded_images = validated_data.pop("uploaded_images", [])
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        if images_data:
+        if uploaded_images is not None:
             instance.photos.all().delete()
-            for images in images_data:
-                PostImage.objects.create(post=instance, **images)
+            for image in uploaded_images:
+                PostImage.objects.create(post=instance, image=image)
 
         return instance
+
+
+class CertificationFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CertificationFile
+        fields = ['id', 'image']
+
+
+class CertyficationTrainerSerializer(serializers.ModelSerializer):
+    images = CertificationFileSerializer(many=True, read_only=True)
+    uploaded_images = serializers.ListSerializer(child=serializers.ImageField(allow_empty_file=True, use_url=False), write_only=True)
+
+    class Meta:
+        model = CertyficationTrainer
+        fields = ['id', 'title', 'issued_by', 'identyficatior', 'issued_date', 'additional_fields', 'images', 'uploaded_images']
+
+    def create(self, validated_data):
+        uploaded_images_data = validated_data.pop('uploaded_images', [])
+        
+        if uploaded_images_data is not None and len(uploaded_images_data) > 4:
+            raise ValidationError({"error": "Max 4 images allowed.", "code": "uploaded_image_limit_exceeded"})
+        
+        cert = CertyficationTrainer.objects.create(**validated_data)
+
+        for img in uploaded_images_data:
+            CertificationFile.objects.create(certyficat=cert, image=img)
+
+        return cert
+    
+    def update(self, instance, validated_data):
+        uploaded_images = validated_data.pop('uploaded_images', None)
+
+        if uploaded_images is not None and len(uploaded_images) > 4:
+            raise ValidationError({"error": "Max 4 images allowed.", "code": "uploaded_image_limit_exceeded"})
+
+        with transaction.atomic():
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
+
+            if uploaded_images is not None:
+                instance.images.all().delete()
+
+                for img in uploaded_images:
+                    CertificationFile.objects.create(certyficat=instance, image=img)
+
+        return instance
+
 

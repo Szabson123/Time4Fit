@@ -36,9 +36,12 @@ class CertyficationTrainer(models.Model):
     issued_by = models.CharField(max_length=255, null=True, blank=True)
     identyficatior = models.CharField(max_length=50, null=True, blank=True)
     issued_date = models.DateField()
+    additional_fields = models.CharField(max_length=500, null=True, blank=True)
 
-    # In the future
-    # file = 
+
+class CertificationFile(models.Model):
+    certyficat = models.ForeignKey(CertyficationTrainer, on_delete=models.CASCADE, related_name='images')
+    image = models.ImageField(upload_to='cert_photos/')
 
 
 class TrainerPost(models.Model):

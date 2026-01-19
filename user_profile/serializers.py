@@ -110,3 +110,6 @@ class TrainerFullProfileSerializer(serializers.Serializer):
     event_past = serializers.IntegerField()
     rate_avg = serializers.DecimalField(decimal_places=1, max_digits=2)
     followers_count = serializers.IntegerField()
+    certyficates = CertyficationTrainerSerializer(many=True, read_only=True)
+    posts = PostSerializer(many=True, read_only=True, source='last_posts')
+

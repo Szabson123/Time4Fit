@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Q, Avg
+from django.db.models import Count, Q, Avg, Prefetch
 from django.utils import timezone
 
 from rest_framework import viewsets
@@ -66,6 +66,13 @@ class TrainerFullProfileView(GenericAPIView):
             followers_count=Count(
                 'followers',
                 distinct=True
+            )
+        )
+        .prefetch_related(
+            Prefetch(
+                'posts',
+                queryset=TrainerPost.objects.order_by('-date')[:5],
+                to_attr='last_posts'
             )
         )
     )

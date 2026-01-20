@@ -7,13 +7,13 @@ from rest_framework.validators import ValidationError
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['id', 'name', 'surname', 'phone_number']
+        fields = ['id', 'name', 'surname']
 
 
 class ProfileTrainerSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainerProfile
-        fields = ['id', 'description', 'specializations']
+        fields = ['id', 'description', 'specializations', 'business_email', 'phone_business']
 
 
 class PostImageSerializer(serializers.ModelSerializer):
@@ -28,8 +28,8 @@ class PostSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrainerPost
-        fields = ["id", "description", "likes", "images", "uploaded_images"]
-        read_only_fields = ['likes']
+        fields = ["id", "description", "likes", "images", "uploaded_images", "date"]
+        read_only_fields = ['likes', "date"]
 
     def create(self, validated_data):
         uploaded_images = validated_data.pop("uploaded_images")
@@ -105,8 +105,9 @@ class CertyficationTrainerSerializer(serializers.ModelSerializer):
 class TrainerFullProfileSerializer(serializers.Serializer):
     description = serializers.CharField()
     specializations = serializers.CharField()
+    phone_business = serializers.CharField()
+    business_email = serializers.EmailField()
     profile = UserProfileSerializer()
-    email = serializers.CharField(source='profile.user.email', read_only=True)
     event_past = serializers.IntegerField()
     rate_avg = serializers.DecimalField(decimal_places=1, max_digits=2)
     followers_count = serializers.IntegerField()

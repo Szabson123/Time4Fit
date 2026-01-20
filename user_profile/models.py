@@ -28,6 +28,8 @@ class TrainerProfile(models.Model):
     profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE, related_name='trainerprofile')
     description = models.CharField(max_length=2000, null=True, blank=True)
     specializations = models.CharField(max_length=1000, null=True, blank=True)
+    business_email = models.EmailField(null=True, blank=True)
+    phone_business = models.CharField(max_length=255, null=True, blank=True)
 
 
 class TrainerRate(models.Model):

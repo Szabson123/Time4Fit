@@ -74,10 +74,10 @@ class TrainerFullProfileView(GenericAPIView):
                 queryset=TrainerPost.objects.order_by('-date')[:5],
                 to_attr='last_posts'
             ),
-            Prefetch(
-                'profile__user__events',
-                filter=Q()
-            )
+            # Prefetch(
+            #     'profile__user__events',
+            #     filter=Q()
+            # )
         )
     )
     lookup_url_kwarg = 'trainer_id'

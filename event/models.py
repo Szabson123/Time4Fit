@@ -55,6 +55,8 @@ class Event(models.Model):
     zip_code = models.CharField(max_length=255, blank=True, null=True)
     public_event = models.BooleanField(default=True)
 
+    event_image = models.ImageField(upload_to='event_photos/', null=True, blank=True)
+
     def __str__(self):
         return self.title
     

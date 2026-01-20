@@ -86,7 +86,7 @@ class EventSerializer(serializers.ModelSerializer):
         fields = ['id', 'unique_id', 'author', 'author_full_name', 'title', 'category', 'short_desc', 'long_desc', 'date_time_event', 'duration_min',
                 'latitude', 'longitude', 'public_event',
                 'country', 'city', 'street', 'street_number', 'flat_number', 'zip_code', 'event_participant_count',
-                'additional_info', 'trainer_list']
+                'additional_info', 'trainer_list', 'event_image']
         
     def validate_date_time_event(self, value):
         if value < timezone.now():
@@ -150,7 +150,7 @@ class EventListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = ['id', 'date_time_event', 'title', 'short_desc', 'category_name', 'event_participant_count',
-                  'country', 'city', 'street', 'street_number', 'flat_number', 'additional_info']
+                  'country', 'city', 'street', 'street_number', 'flat_number', 'additional_info', 'event_image']
         
     def get_category_name(self, obj):
         return obj.category.name if obj.category else None

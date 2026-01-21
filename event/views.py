@@ -182,7 +182,7 @@ class EventInvitationViewSet(mixins.CreateModelMixin, mixins.ListModelMixin, vie
         event = get_object_or_404(Event, pk=event_id)
 
         if user == event.author or EventParticipant.objects.filter(event=event, user=user, role__in=['admin', 'trainer']).exists():
-            return EventInvitation.objects.select_related('event').filter(event=event)
+            return EventInvitation.objects.select_related('event').filter(event=event).order_by('-id')
 
         raise PermissionDenied({"error": "You don't have permissions to invite users to this event", "code": "no_permissions"})
 

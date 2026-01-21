@@ -13,7 +13,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class ProfileTrainerSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainerProfile
-        fields = ['id', 'description', 'specializations', 'business_email', 'phone_business']
+        fields = ['id', 'description', 'specializations', 'business_email', 'phone_business', 'img_profile']
 
 
 class PostImageSerializer(serializers.ModelSerializer):
@@ -107,6 +107,8 @@ class TrainerFullProfileSerializer(serializers.Serializer):
     specializations = serializers.CharField()
     phone_business = serializers.CharField()
     business_email = serializers.EmailField()
+    img_profile = serializers.ImageField()
+    
     profile = UserProfileSerializer()
     event_past = serializers.IntegerField()
     rate_avg = serializers.DecimalField(decimal_places=1, max_digits=2)

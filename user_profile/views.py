@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Q, Avg, Prefetch
+from django.db.models import Count, Q, Avg, Prefetch, ExpressionWrapper, F, IntegerField
 from django.utils import timezone
 
 from rest_framework import viewsets
@@ -71,7 +71,16 @@ class TrainerFullProfileView(GenericAPIView):
             ),
             Prefetch(
                 'profile__user__events',
-                queryset=Event.objects.filter(public_event=True).order_by('-date_time_event')[:3],
+                queryset=Event.objects.filter(public_event=True)
+                .select_related('additional_info')
+                .annotate(
+                    taken_spots=Count('eventparticipant'),
+                    available_places=ExpressionWrapper(
+                        F('additional_info__places_for_people_limit') - Count('eventparticipant'),
+                        output_field=IntegerField()
+                    )
+                )
+                .order_by('-date_time_event')[:3],
                 to_attr='similar_events'
             )
         )

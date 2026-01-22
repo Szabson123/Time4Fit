@@ -105,14 +105,16 @@ class CertyficationTrainerSerializer(serializers.ModelSerializer):
 class AdditionalEventInfoToPrfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = EventAdditionalInfo
-        fields = ['advanced_level', 'places_for_people_limit', 'age_limit']
+        fields = ['advanced_level', 'age_limit']
 
 class EventTrainerSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
     additional_info = AdditionalEventInfoToPrfileSerializer(many=False, read_only=True)
+    available_places = serializers.IntegerField(read_only=True)
+    
     class Meta:
         model = Event
-        fields = ['id', 'category_name', 'date_time_event', 'city', 'street', 'street_number', 'flat_number', 'additional_info']
+        fields = ['id', 'category_name', 'date_time_event', 'city', 'street', 'street_number', 'flat_number', 'additional_info', 'available_places']
 
     def get_category_name(self, obj):
         if obj.category is not None:

@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404
-from django.db.models import Q, Count
+from django.db.models import Q, Count, F, Subquery, OuterRef, Value, CharField
 from django.utils import timezone
 from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist
@@ -55,28 +55,35 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         base_qs = Event.objects.select_related('category', 'additional_info').prefetch_related('eventparticipant__user__profile').order_by('date_time_event')
-
         filters = Q(public_event=True)
+
         if user.is_authenticated:
             filters |= Q(author=user)
             filters |= Q(eventparticipant__user=user)
 
+        qs = base_qs.filter(filters, date_time_event__gte=timezone.now())
+        qs = qs.annotate(event_participant_count=Count('eventparticipant'))
+
         if self.action == "list":
-            return (
-                base_qs
-                .filter(filters, date_time_event__gte=timezone.now())
-                .annotate(event_participant_count=Count('eventparticipant'))
-            )
+            return qs.distinct()
 
         if self.action == "retrieve":
-            return (
-                base_qs
-                .filter(filters,date_time_event__gte=timezone.now())
-                .annotate(event_participant_count=Count('eventparticipant'))
-                .distinct()
-            )
+            if user.is_authenticated:
+                subquery = EventParticipant.objects.filter(
+                    user=user,
+                    event=OuterRef('pk')
+                ).values('role')[:1]
 
-        return base_qs.filter(author=user)
+                qs = qs.annotate(role_in_event=Subquery(subquery))
+            else:
+                qs = qs.annotate(role_in_event=Value(None, output_field=CharField(null=True)))
+
+            return qs.distinct()
+        
+        if user.is_authenticated:
+            return base_qs.filter(author=user)
+        
+        return base_qs.none()
     
     @action(detail=False, methods=['get'], permission_classes=[AllowAny], serializer_class=EventMapSerializer)
     def events_on_map(self, request, *args, **kwargs):
@@ -87,13 +94,21 @@ class EventViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], serializer_class=EventSerializer, throttle_classes = [TenPerMinuteThrottle], url_path=r'by-code/(?P<access_code>[^/.]+)')
     def get_event_with_code(self, request, *args, **kwargs):
         access_code = self.kwargs.get('access_code')
+
+        user = self.request.user
+        subquery = EventParticipant.objects.filter(
+                    user=user,
+                    event=OuterRef('pk')
+                ).values('role')[:1]
+        
         try:
             event = Event.objects.filter(
                 eventinvitation__code=access_code,
                 eventinvitation__is_active=True,
                 eventinvitation__is_used=False,
                 date_time_event__gte=timezone.now()
-            ).latest('date_time_event')
+            ).annotate(role_in_event=Subquery(subquery)).latest('date_time_event')
+            
             
         except Event.DoesNotExist:
             return Response({"error": "Event didnt found", "code": "event_does_not_exist"}, status=status.HTTP_404_NOT_FOUND)

@@ -76,17 +76,16 @@ def test_annon_dont_see_events_in_past(api_client, event_factory, user_factory):
 @pytest.mark.django_db
 def test_annon_dont_see_events_in_past_even_if_knows_title(api_client, event_factory, user_factory):
     user = user_factory()
-
-    public_event1 = event_factory(author=user)
-    public_event2 = event_factory(author=user, date_time_event=timezone.now() - timedelta(minutes=10), title="Test 1")
-    private_event = event_factory(public_event=False, author=user, title="Test 1")
+    
+    public_event2 = event_factory(author=user, date_time_event=timezone.now() - timedelta(minutes=10), title="Test 1", public_event=True)
+    private_event = event_factory(public_event=False, author=user, title="Test 1", date_time_event=timezone.now() + timedelta(days=1))
 
     url = f'/event/events/?title=Test 1'
 
     response = api_client.get(url, format="json")
-    assert response.status_code == 200, f"Otrzymano błąd walidacji {response.data}"
+    
+    assert response.status_code == 200
     assert response.data["count"] == 0
-    assert len(response.data["results"]) == 0
 
 @pytest.mark.django_db
 def test_event_pagination(api_client, event_factory, user_factory):

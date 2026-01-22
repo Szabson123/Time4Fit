@@ -2,7 +2,7 @@ from .models import PostImage, TrainerPost, TrainerProfile, CertificationFile, C
 from rest_framework import serializers
 from django.db import transaction
 from rest_framework.validators import ValidationError
-
+from event.models import Event, EventAdditionalInfo
 
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
@@ -13,7 +13,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 class ProfileTrainerSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainerProfile
-        fields = ['id', 'description', 'specializations', 'business_email', 'phone_business', 'img_profile']
+        fields = ['id', 'description', 'specializations', 'business_email', 'phone_business', 'img_profile', 'pick_specialization']
 
 
 class PostImageSerializer(serializers.ModelSerializer):
@@ -102,17 +102,31 @@ class CertyficationTrainerSerializer(serializers.ModelSerializer):
         return instance
 
 
+class AdditionalEventInfoToPrfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EventAdditionalInfo
+        fields = ['advanced_level', 'places_for_people_limit', 'age_limit']
+
+class EventTrainerSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(read_only=True, source='category.name')
+    additional_info = AdditionalEventInfoToPrfileSerializer(many=False, read_only=True)
+    class Meta:
+        model = Event
+        fields = ['id', 'category_name', 'date_time_event', 'city', 'street', 'street_number', 'flat_number', 'additional_info']
+
+
 class TrainerFullProfileSerializer(serializers.Serializer):
     description = serializers.CharField()
     specializations = serializers.CharField()
     phone_business = serializers.CharField()
     business_email = serializers.EmailField()
     img_profile = serializers.ImageField()
-    
+    pick_specialization = serializers.CharField()
     profile = UserProfileSerializer()
     event_past = serializers.IntegerField()
-    rate_avg = serializers.DecimalField(decimal_places=1, max_digits=2)
+    rate_avg = serializers.DecimalField(decimal_places=1, max_digits=5)
     followers_count = serializers.IntegerField()
     certyficates = CertyficationTrainerSerializer(many=True, read_only=True)
     posts = PostSerializer(many=True, read_only=True, source='last_posts')
+    events = EventTrainerSerializer(many=True, read_only=True, source='profile.user.similar_events')
 

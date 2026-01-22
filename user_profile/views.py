@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from .serializers import PostSerializer, ProfileTrainerSerializer, CertyficationTrainerSerializer, TrainerFullProfileSerializer
 from .models import TrainerPost, TrainerProfile, CertyficationTrainer
 from .permissions import OnlyOwnerOfProfileCanModify, OnlyOnwerOfTrainerProfile
+from event.models import Event
 
 
 class TrainerPostViewSet(viewsets.ModelViewSet):
@@ -59,25 +60,20 @@ class TrainerFullProfileView(GenericAPIView):
                 filter=Q(profile__user__events__date_time_event__lt=timezone.now()),
                 distinct=True,
             ),
-            rate_avg=Avg(
-                'trainerrate__rate',
-                distinct=True,
-            ),
-            followers_count=Count(
-                'followers',
-                distinct=True
-            )
+            rate_avg=Avg('trainerrate__rate'),
+            followers_count=Count('followers', distinct=True)
         )
         .prefetch_related(
             Prefetch(
                 'posts',
-                queryset=TrainerPost.objects.order_by('-date')[:5],
+                queryset=TrainerPost.objects.order_by('-date'),
                 to_attr='last_posts'
             ),
-            # Prefetch(
-            #     'profile__user__events',
-            #     filter=Q()
-            # )
+            Prefetch(
+                'profile__user__events',
+                queryset=Event.objects.filter(public_event=True).order_by('-date_time_event'),
+                to_attr='similar_events'
+            )
         )
     )
     lookup_url_kwarg = 'trainer_id'

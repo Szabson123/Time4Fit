@@ -66,12 +66,12 @@ class TrainerFullProfileView(GenericAPIView):
         .prefetch_related(
             Prefetch(
                 'posts',
-                queryset=TrainerPost.objects.order_by('-date'),
+                queryset=TrainerPost.objects.order_by('-date')[:5],
                 to_attr='last_posts'
             ),
             Prefetch(
                 'profile__user__events',
-                queryset=Event.objects.filter(public_event=True).order_by('-date_time_event'),
+                queryset=Event.objects.filter(public_event=True).order_by('-date_time_event')[:3],
                 to_attr='similar_events'
             )
         )

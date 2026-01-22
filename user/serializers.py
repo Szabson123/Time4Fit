@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import CentralUser
 from user_profile.models import UserProfile
-
+from subscription.models import Subscription
+from user_profile.serializers import UserProfileSerializer
 
 class RegisterUserSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField()
@@ -82,3 +83,21 @@ class ResetPasswordConfirmSerializer(serializers.Serializer):
         if len(value) < 8:
             raise serializers.ValidationError("Password is too short")
         return value
+    
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    plan_name = serializers.CharField(source='plan.name', read_only=True)
+    is_valid = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Subscription
+        fields = ['status', 'plan_name', 'current_period_end', 'is_valid', 'stripe_subscription_id']
+
+
+class UserMeSerializer(serializers.ModelSerializer):
+    subscription = SubscriptionSerializer(read_only=True)
+    profile = UserProfileSerializer(read_only=True)
+
+    class Meta:
+        model = CentralUser
+        fields = ['id', 'email', 'profile', 'subscription']

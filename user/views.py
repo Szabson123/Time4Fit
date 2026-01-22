@@ -6,8 +6,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 
-from .serializers import RegisterUserSerializer, LoginUserSerializer, ResetPasswordUserSerializer, OtpVerifySerializer, ResetPasswordConfirmSerializer
+from .serializers import UserMeSerializer, RegisterUserSerializer, LoginUserSerializer, ResetPasswordUserSerializer, OtpVerifySerializer, ResetPasswordConfirmSerializer
 from .utils import gen_code, hmac_code, default_expires
 from .models import CentralUser, TwoFactory
 from .tasks import send_welcome_email
@@ -231,3 +232,17 @@ class ResetPasswordConfirmView(GenericAPIView):
             "access": str(refresh.access_token),
             "detail": "password_changed"
         })
+
+
+class CurrentUserView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserMeSerializer
+
+    def get(self, request):
+        user = request.user
+
+        if hasattr(user, 'subscription'):
+             pass 
+
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)

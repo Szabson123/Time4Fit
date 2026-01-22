@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'user',
     'user_profile',
     'event',
+    'subscription',
 
     'drf_spectacular',
     'rest_framework',

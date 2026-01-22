@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import (
     TokenVerifyView,
 )
 
-from .views import UserRegisterView, UserLoginView, ResetPasswordView, OtpVerifyView, ResetPasswordConfirmView
+from .views import UserRegisterView, CurrentUserView, UserLoginView, ResetPasswordView, OtpVerifyView, ResetPasswordConfirmView
 
 urlpatterns = [
     path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
@@ -17,5 +17,5 @@ urlpatterns = [
 
     path('otp_verify/', OtpVerifyView.as_view(), name='otp_verify'),
     path("reset-password/confirm/", ResetPasswordConfirmView.as_view(), name='reset_password_confirm'),
-
+    path('me/', CurrentUserView.as_view(), name='me')
 ]

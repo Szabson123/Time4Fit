@@ -79,14 +79,20 @@ class EventSerializer(serializers.ModelSerializer):
     event_participant_count = serializers.IntegerField(read_only=True)
     author_full_name = serializers.SerializerMethodField()
     trainer_list = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         read_only_fields = ['unique_id', 'author']
-        fields = ['id', 'unique_id', 'author', 'author_full_name', 'title', 'category', 'short_desc', 'long_desc', 'date_time_event', 'duration_min',
+        fields = ['id', 'unique_id', 'author', 'author_full_name', 'title', 'category_name', 'short_desc', 'long_desc', 'date_time_event', 'duration_min',
                 'latitude', 'longitude', 'public_event',
                 'country', 'city', 'street', 'street_number', 'flat_number', 'zip_code', 'event_participant_count',
                 'additional_info', 'trainer_list', 'event_image']
+        
+    def get_category_name(self, obj):
+        if obj.category is not None:
+            return obj.category.name
+        return None
         
     def validate_date_time_event(self, value):
         if value < timezone.now():

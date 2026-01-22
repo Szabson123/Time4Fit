@@ -108,11 +108,16 @@ class AdditionalEventInfoToPrfileSerializer(serializers.ModelSerializer):
         fields = ['advanced_level', 'places_for_people_limit', 'age_limit']
 
 class EventTrainerSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(read_only=True, source='category.name')
+    category_name = serializers.SerializerMethodField()
     additional_info = AdditionalEventInfoToPrfileSerializer(many=False, read_only=True)
     class Meta:
         model = Event
         fields = ['id', 'category_name', 'date_time_event', 'city', 'street', 'street_number', 'flat_number', 'additional_info']
+
+    def get_category_name(self, obj):
+        if obj.category is not None:
+            return obj.category.name
+        return None
 
 
 class TrainerFullProfileSerializer(serializers.Serializer):

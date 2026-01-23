@@ -339,3 +339,13 @@ def test_author_can_kick_user_and_user_loses_access(auth_api_client, user_factor
     response = client2.get(event_url)
     assert response.status_code == 404
 
+@pytest.mark.django_db
+def test_join_to_public_event_happy_path(auth_api_client, user_factory, event_factory):
+    client, user = auth_api_client
+    author = user_factory()
+    event = event_factory(author=author, public_event=True)
+
+    url = f'/event/events/{event.id}/join_to_public_event/'
+    response = client.post(url)
+
+    assert response.status_code == 200, f'blad {response.data}'

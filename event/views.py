@@ -45,6 +45,10 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             self.permission_classes = [AllowAny]
+
+        elif self.action == "join_to_public_event":
+            self.permission_classes = [IsAuthenticated]
+            
         else:
             self.permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
         return super().get_permissions()
@@ -67,7 +71,7 @@ class EventViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return qs.distinct()
 
-        if self.action == "retrieve":
+        if self.action in ["retrieve", "join_to_public_event"]:
             if user.is_authenticated:
                 subquery = EventParticipant.objects.filter(
                     user=user,
@@ -85,13 +89,13 @@ class EventViewSet(viewsets.ModelViewSet):
         
         return base_qs.none()
     
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny], serializer_class=EventMapSerializer)
+    @action(detail=False, methods=['get'],  serializer_class=EventMapSerializer)
     def events_on_map(self, request, *args, **kwargs):
         queryset = Event.objects.filter(public_event=True, date_time_event__gte=timezone.now())
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], serializer_class=EventSerializer, throttle_classes = [TenPerMinuteThrottle], url_path=r'by-code/(?P<access_code>[^/.]+)')
+    @action(detail=False, methods=['get'], serializer_class=EventSerializer, throttle_classes = [TenPerMinuteThrottle], url_path=r'by-code/(?P<access_code>[^/.]+)')
     def get_event_with_code(self, request, *args, **kwargs):
         access_code = self.kwargs.get('access_code')
 
@@ -109,12 +113,29 @@ class EventViewSet(viewsets.ModelViewSet):
                 date_time_event__gte=timezone.now()
             ).annotate(role_in_event=Subquery(subquery)).latest('date_time_event')
             
-            
         except Event.DoesNotExist:
             return Response({"error": "Event didnt found", "code": "event_does_not_exist"}, status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(event, many=False)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'], serializer_class=NoneSerializer)
+    def join_to_public_event(self, request, *args, **kwargs):
+        user = self.request.user
+        event = self.get_object()
+
+        if event.public_event == False:
+            return Response({"error": "You can't entry to this event without access code", "code": "no_access_code"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if EventParticipant.objects.filter(event=event, user=user).exists() or event.author == user:
+            return Response({"error": "You are already in this event", "code": "participant_already_exist"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        EventParticipant.objects.create(
+            user=user,
+            event=event,
+            role='participant',
+        )
+        return Response({"success": "user added to event"}, status=status.HTTP_200_OK)
+    
 
 class CategoryListView(ListAPIView):
     serializer_class = CategorySerializer

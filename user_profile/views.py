@@ -61,7 +61,7 @@ class TrainerFullProfileView(GenericAPIView):
                 distinct=True,
             ),
             rate_avg=Avg('trainerrate__rate'),
-            followers_count=Count('followers', distinct=True)
+            followers_count=Count('followers', distinct=True),
         )
         .prefetch_related(
             Prefetch(

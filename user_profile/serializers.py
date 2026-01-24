@@ -136,4 +136,11 @@ class TrainerFullProfileSerializer(serializers.Serializer):
     certyficates = CertyficationTrainerSerializer(many=True, read_only=True)
     posts = PostSerializer(many=True, read_only=True, source='last_posts')
     events = EventTrainerSerializer(many=True, read_only=True, source='profile.user.similar_events')
+    is_owner = serializers.SerializerMethodField()
 
+    def get_is_owner(self, obj):
+        request = self.context.get('request')
+        
+        if request and request.user.is_authenticated:
+            return obj.profile.user == request.user
+        return False

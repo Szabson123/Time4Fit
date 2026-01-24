@@ -101,3 +101,13 @@ class UserMeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CentralUser
         fields = ['id', 'email', 'profile', 'subscription']
+
+
+class UserInfoAndSettingsInfoSerializer(serializers.ModelSerializer):
+    is_trainer = serializers.BooleanField(read_only=True)
+    trainer_id = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = UserProfile
+        fields = ['name', 'surname', 'sex', 'birth_day', 'profile_picture', 'phone_number', 'is_trainer', 'trainer_id']
+        

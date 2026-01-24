@@ -1,5 +1,6 @@
 from django.db import transaction
-
+from django.db.models import Exists, OuterRef, Subquery
+from django.shortcuts import get_object_or_404
 import uuid
 
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -8,13 +9,13 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
-from .serializers import UserMeSerializer, RegisterUserSerializer, LoginUserSerializer, ResetPasswordUserSerializer, OtpVerifySerializer, ResetPasswordConfirmSerializer
+from .serializers import UserInfoAndSettingsInfoSerializer, UserMeSerializer, RegisterUserSerializer, LoginUserSerializer, ResetPasswordUserSerializer, OtpVerifySerializer, ResetPasswordConfirmSerializer
 from .utils import gen_code, hmac_code, default_expires
 from .models import CentralUser, TwoFactory
 from .tasks import send_welcome_email
 
 from django.utils import timezone
-from user_profile.models import UserProfile
+from user_profile.models import UserProfile, TrainerProfile
 
 
 class UserRegisterView(GenericAPIView):
@@ -244,3 +245,30 @@ class CurrentUserView(GenericAPIView):
 
         serializer = self.get_serializer(user)
         return Response(serializer.data)
+    
+
+class UserInfoAndSettingsInfoViewSet(GenericAPIView):
+    serializer_class = UserInfoAndSettingsInfoSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = (
+            UserProfile.objects
+            .select_related('user')
+            .annotate(
+                is_trainer=Exists(
+                    TrainerProfile.objects.filter(
+                        profile=OuterRef('pk')
+                    )
+                ),
+                trainer_id=Subquery(
+                    TrainerProfile.objects.filter(
+                        profile=OuterRef('pk')
+                    ).values('pk')[:1]
+                )
+            )
+        )
+    
+    def get(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        profile = get_object_or_404(qs, user=request.user)
+        ser = self.get_serializer(profile)
+        return Response(ser.data)

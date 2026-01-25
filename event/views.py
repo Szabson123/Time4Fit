@@ -117,7 +117,8 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({"error": "Event didnt found", "code": "event_does_not_exist"}, status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(event, many=False)
         return Response(serializer.data)
-
+    
+    @transaction.atomic
     @action(detail=True, methods=['post'], serializer_class=NoneSerializer)
     def join_to_public_event(self, request, *args, **kwargs):
         user = self.request.user
@@ -128,6 +129,13 @@ class EventViewSet(viewsets.ModelViewSet):
 
         if EventParticipant.objects.filter(event=event, user=user).exists() or event.author == user:
             return Response({"error": "You are already in this event", "code": "participant_already_exist"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        add = getattr(event, 'additional_info', None)
+        if add and add.places_for_people_limit:
+            add = EventAdditionalInfo.objects.select_for_update().get(pk=add.pk)
+            current = EventParticipant.objects.filter(event=event).count()
+            if current >= add.places_for_people_limit:
+                return Response({"error": "No seats avaible", "code": "no_seats_avaible"}, status=status.HTTP_400_BAD_REQUEST)
         
         EventParticipant.objects.create(
             user=user,

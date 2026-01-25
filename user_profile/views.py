@@ -29,6 +29,7 @@ class ProfileTrainerViewSet(viewsets.ModelViewSet):
     serializer_class = ProfileTrainerSerializer
     queryset = TrainerProfile.objects.all()
     permission_classes = [IsAuthenticated, OnlyOwnerOfProfileCanModify]
+    http_method_names = ["post", "put", "patch", "delete"]
 
     def perform_create(self, serializer):
         profile = self.request.user.profile

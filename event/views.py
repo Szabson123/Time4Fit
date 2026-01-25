@@ -18,7 +18,7 @@ from .serializers import( EventSerializer, EventInvitationCreateSerializer, Even
                           CategorySerializer, EventParticipantSerializer, EventInvitationSerializer, EventInvSerializer, NoneSerializer,
                           ChangeRoleSerializer, EventMapSerializer)
 
-from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES
+from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES, EventAdditionalInfo
 from .permissions import IsEventAuthor, IsAuthorOrReadOnly
 from .filters import EventListFilter
 
@@ -135,7 +135,7 @@ class EventViewSet(viewsets.ModelViewSet):
             add = EventAdditionalInfo.objects.select_for_update().get(pk=add.pk)
             current = EventParticipant.objects.filter(event=event).count()
             if current >= add.places_for_people_limit:
-                return Response({"error": "No seats avaible", "code": "no_seats_avaible"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "no seatsavaible", "code": "no_seats_avaible"}, status=status.HTTP_400_BAD_REQUEST)
         
         EventParticipant.objects.create(
             user=user,

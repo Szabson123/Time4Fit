@@ -77,4 +77,14 @@ class TrainerPost(models.Model):
 class PostImage(models.Model):
     post = models.ForeignKey(TrainerPost, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='post_photos/')
+
+
+class PhotosCollection(models.Model):
+    trainer = models.ForeignKey(TrainerProfile, on_delete=models.CASCADE, related_name='photoscollections')
+    name = models.CharField(max_length=255)
+
+
+class TrainerImages(models.Model):
+    collection = models.ForeignKey(PhotosCollection, on_delete=models.CASCADE, related_name='images')
+    img = models.ImageField(upload_to='trainer_collection_photos/')
     

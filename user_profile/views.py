@@ -6,10 +6,10 @@ from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.validators import ValidationError
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.response import Response
 
-from .serializers import PostSerializer, ProfileTrainerSerializer, CertyficationTrainerSerializer, TrainerFullProfileSerializer
+from .serializers import TrainerListSerializer, PostSerializer, ProfileTrainerSerializer, CertyficationTrainerSerializer, TrainerFullProfileSerializer
 from .models import TrainerPost, TrainerProfile, CertyficationTrainer
 from .permissions import OnlyOwnerOfProfileCanModify, OnlyOnwerOfTrainerProfile
 from event.models import Event
@@ -97,3 +97,17 @@ class TrainerFullProfileView(GenericAPIView):
         trainer = self.get_object()
         serializer = self.get_serializer(trainer)
         return Response(serializer.data)
+
+
+class TrainerProfilesListViewSet(ListAPIView):
+    serializer_class = TrainerListSerializer
+    permission_classes = [AllowAny]
+    queryset = (
+        TrainerProfile.objects
+        .select_related('profile')
+        .annotate(
+            num_photos=Count('photoscollections__images',distinct=True),
+            avg_rate=Avg('trainerrate__rate', distinct=True),
+            followers_count=Count('followers', distinct=True),
+        )
+    )

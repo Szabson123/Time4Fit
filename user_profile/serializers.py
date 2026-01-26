@@ -145,3 +145,19 @@ class TrainerFullProfileSerializer(serializers.Serializer):
         if request and request.user.is_authenticated:
             return obj.profile.user == request.user
         return False
+
+
+class ProfileBasicInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['name', 'surname']
+
+class TrainerListSerializer(serializers.ModelSerializer):
+    profile = ProfileBasicInfoSerializer(read_only=True)
+    num_photos = serializers.IntegerField()
+    avg_rate = serializers.DecimalField(max_digits=5, decimal_places=2)
+    followers_count = serializers.IntegerField()
+
+    class Meta:
+        model = TrainerProfile
+        fields = ['id', 'profile', 'pick_specialization', 'business_email', 'phone_business', 'num_photos', 'avg_rate', 'followers_count']   

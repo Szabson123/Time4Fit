@@ -160,4 +160,4 @@ class TrainerListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrainerProfile
-        fields = ['id', 'profile', 'pick_specialization', 'business_email', 'phone_business', 'num_photos', 'avg_rate', 'followers_count']   
+        fields = ['id', 'profile', 'pick_specialization', 'business_email', 'phone_business', 'num_photos', 'avg_rate', 'followers_count', 'img_profile']   

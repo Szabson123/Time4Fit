@@ -111,10 +111,11 @@ class EventTrainerSerializer(serializers.ModelSerializer):
     category_name = serializers.SerializerMethodField()
     additional_info = AdditionalEventInfoToPrfileSerializer(many=False, read_only=True)
     available_places = serializers.IntegerField(read_only=True)
-    
+    is_free = serializers.BooleanField()
+
     class Meta:
         model = Event
-        fields = ['id', 'category_name', 'date_time_event', 'city', 'street', 'street_number', 'flat_number', 'additional_info', 'available_places']
+        fields = ['id', 'category_name', 'date_time_event', 'city', 'street', 'street_number', 'flat_number', 'additional_info', 'available_places', 'title', 'is_free']
 
     def get_category_name(self, obj):
         if obj.category is not None:

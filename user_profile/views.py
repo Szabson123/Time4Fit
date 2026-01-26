@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Q, Avg, Prefetch, ExpressionWrapper, F, IntegerField
+from django.db.models import Count, Q, Avg, Prefetch, ExpressionWrapper, F, IntegerField, Case, When, Value, BooleanField
 from django.utils import timezone
 
 from rest_framework import viewsets
@@ -79,8 +79,13 @@ class TrainerFullProfileView(GenericAPIView):
                     available_places=ExpressionWrapper(
                         F('additional_info__places_for_people_limit') - Count('eventparticipant'),
                         output_field=IntegerField()
+                    ),
+                    is_free=ExpressionWrapper(
+                        Q(additional_info__price=0),
+                        output_field=BooleanField()
                     )
                 )
+                # Pamiętać zadziała to tylko przy detail view nigdy przy liście
                 .order_by('-date_time_event')[:3],
                 to_attr='similar_events'
             )

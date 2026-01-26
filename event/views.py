@@ -45,10 +45,10 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             self.permission_classes = [AllowAny]
-
-        elif self.action == "join_to_public_event":
-            self.permission_classes = [IsAuthenticated]
             
+        elif self.action in ["join_to_public_event", "quit_from_event"]:
+            self.permission_classes = [IsAuthenticated]
+
         else:
             self.permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
         return super().get_permissions()
@@ -71,7 +71,7 @@ class EventViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return qs.distinct()
 
-        if self.action in ["retrieve", "join_to_public_event"]:
+        if self.action in ["retrieve", "join_to_public_event", "quit_from_event"]:
             if user.is_authenticated:
                 subquery = EventParticipant.objects.filter(
                     user=user,
@@ -144,6 +144,20 @@ class EventViewSet(viewsets.ModelViewSet):
         )
         return Response({"success": "user added to event"}, status=status.HTTP_200_OK)
     
+    @action(detail=True, methods=['post'], serializer_class=NoneSerializer)
+    def quit_from_event(self, request, *args, **kwargs):
+        user = self.request.user
+        event = self.get_object()
+        
+        participant = EventParticipant.objects.filter(user=user, event=event)
+
+        if not participant.exists():
+            return Response({"error": "You are not in this event", "code": "participant_not_exist"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            participant.delete()
+        
+        return Response({"success": "user deleted from participant list"}, status=status.HTTP_200_OK) 
+
 
 class CategoryListView(ListAPIView):
     serializer_class = CategorySerializer

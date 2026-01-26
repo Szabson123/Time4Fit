@@ -11,3 +11,5 @@ __pycache__/
 /.pytest_cache
 plik.jsonl
 output_filtered_4.jsonl
+test_algo_trainers.py
+aaa.json

@@ -349,3 +349,16 @@ def test_join_to_public_event_happy_path(auth_api_client, user_factory, event_fa
     response = client.post(url)
 
     assert response.status_code == 200, f'blad {response.data}'
+
+@pytest.mark.django_db
+def test_quit_from_event(auth_api_client, user_factory, event_factory, event_participant_factory):
+    client, user = auth_api_client
+    author = user_factory()
+    event = event_factory(author=author, public_event=True)
+
+    event_participant = event_participant_factory(event=event, user=user)
+    
+    url = f'/event/events/{event.id}/quit_from_event/'
+    response = client.post(url)
+
+    assert response.status_code == 200, f'blad {response.data}'

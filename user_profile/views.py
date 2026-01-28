@@ -1,19 +1,20 @@
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Q, Avg, Prefetch, ExpressionWrapper, F, IntegerField, Case, When, Value, BooleanField
+from django.db.models import Count, Subquery, Q, Avg, DecimalField, Prefetch, ExpressionWrapper, F, IntegerField, Case, When, Value, BooleanField
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.validators import ValidationError
-from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
 from .serializers import TrainerListSerializer, PostSerializer, ProfileTrainerSerializer, CertyficationTrainerSerializer, TrainerFullProfileSerializer
-from .models import TrainerPost, TrainerProfile, CertyficationTrainer
+from .models import TrainerPost, TrainerProfile, CertyficationTrainer, TrainerImages
 from .permissions import OnlyOwnerOfProfileCanModify, OnlyOnwerOfTrainerProfile
 from event.models import Event
-
+from .utils import *
 
 class TrainerPostViewSet(viewsets.ModelViewSet):
     serializer_class = PostSerializer
@@ -49,20 +50,16 @@ class CertyficationViewSet(viewsets.ModelViewSet):
         serializer.save(trainer=trainer_profile)
 
 
-class TrainerFullProfileView(GenericAPIView):
+class TrainerFullProfileView(RetrieveAPIView):
     serializer_class = TrainerFullProfileSerializer
     permission_classes = [AllowAny]
     queryset = (
         TrainerProfile.objects
         .select_related('profile', 'profile__user')
         .annotate(
-            event_past=Count(
-                'profile__user__events',
-                filter=Q(profile__user__events__date_time_event__lt=timezone.now()),
-                distinct=True,
-            ),
-            rate_avg=Avg('trainerrate__rate'),
-            followers_count=Count('followers', distinct=True),
+            event_past=Coalesce(Subquery(event_sq, output_field=IntegerField()), Value(0)),
+            rate_avg=Subquery(avg_rate_sq, output_field=DecimalField()),
+            followers_count=Coalesce(Subquery(followers_sq, output_field=IntegerField()), Value(0))
         )
         .prefetch_related(
             Prefetch(
@@ -93,11 +90,6 @@ class TrainerFullProfileView(GenericAPIView):
     )
     lookup_url_kwarg = 'trainer_id'
 
-    def get(self, request, *args, **kwargs):
-        trainer = self.get_object()
-        serializer = self.get_serializer(trainer)
-        return Response(serializer.data)
-
 
 class TrainerProfilesListViewSet(ListAPIView):
     serializer_class = TrainerListSerializer
@@ -106,8 +98,8 @@ class TrainerProfilesListViewSet(ListAPIView):
         TrainerProfile.objects
         .select_related('profile')
         .annotate(
-            num_photos=Count('photoscollections__images',distinct=True),
-            avg_rate=Avg('trainerrate__rate', distinct=True),
-            followers_count=Count('followers', distinct=True),
+            num_photos=Coalesce(Subquery(photos_sq, output_field=IntegerField()), Value(0)),
+            avg_rate=Subquery(avg_rate_sq, output_field=DecimalField()),
+            followers_count=Coalesce(Subquery(followers_sq, output_field=IntegerField()), Value(0))
         )
     )

@@ -4,7 +4,7 @@ from django.db.models import Count, Subquery, Q, Avg, DecimalField, Prefetch, Ex
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins, status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.validators import ValidationError
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
@@ -15,6 +15,7 @@ from .models import TrainerPost, TrainerProfile, CertyficationTrainer, TrainerIm
 from .permissions import OnlyOwnerOfProfileCanModify, OnlyOnwerOfTrainerProfile
 from event.models import Event
 from .utils import *
+from event.serializers import NoneSerializer
 
 class TrainerPostViewSet(viewsets.ModelViewSet):
     serializer_class = PostSerializer
@@ -103,3 +104,38 @@ class TrainerProfilesListViewSet(ListAPIView):
             followers_count=Coalesce(Subquery(followers_sq, output_field=IntegerField()), Value(0))
         )
     )
+
+
+class GiveObservationView(GenericAPIView):
+    serializer_class = NoneSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        trainer_id = self.kwargs.get('trainer_id')
+        user = self.request.user
+        trainer = get_object_or_404(TrainerProfile, pk=trainer_id)
+
+        obj, created = TrainerObservation.objects.get_or_create(follower=user, following=trainer)
+
+        if not created:
+            return Response({"error": "You already have observation", "code": "already_have_observation"},status=status.HTTP_409_CONFLICT)
+        
+        return Response({"id": obj.id}, status=status.HTTP_201_CREATED)
+    
+
+class RevokeObservationView(GenericAPIView):
+    serializer_class = NoneSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+
+        trainer_id = self.kwargs.get('trainer_id')
+        user = self.request.user
+        trainer = get_object_or_404(TrainerProfile, pk=trainer_id)
+
+        deleted_count, _ = TrainerObservation.objects.filter(follower=user, following=trainer).delete()
+
+        if deleted_count == 0:
+            return Response({"error": "You are not observing this trainer", "code": "have_not_observation"},status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response({"success": "Observation revoked", "code": "obs_revoke_success"}, status=status.HTTP_200_OK)

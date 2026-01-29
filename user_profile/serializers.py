@@ -1,4 +1,4 @@
-from .models import PostImage, TrainerPost, TrainerProfile, CertificationFile, CertyficationTrainer, UserProfile
+from .models import PostImage, TrainerPost, TrainerProfile, CertificationFile, CertyficationTrainer, UserProfile, PhotosCollection
 from rest_framework import serializers
 from django.db import transaction
 from rest_framework.validators import ValidationError
@@ -161,3 +161,13 @@ class TrainerListSerializer(serializers.ModelSerializer):
     class Meta:
         model = TrainerProfile
         fields = ['id', 'profile', 'pick_specialization', 'business_email', 'phone_business', 'num_photos', 'avg_rate', 'followers_count', 'img_profile']   
+
+
+class PhotosCollectionSerializer(serializers.ModelSerializer):
+    img_count = serializers.IntegerField(read_only=True)
+    first_img = serializers.ImageField(read_only=True)
+    
+    class Meta:
+        model = PhotosCollection
+        fields = ['id', 'name', 'img_count', 'first_img']
+

@@ -87,4 +87,4 @@ class PhotosCollection(models.Model):
 class TrainerImages(models.Model):
     collection = models.ForeignKey(PhotosCollection, on_delete=models.CASCADE, related_name='images')
     img = models.ImageField(upload_to='trainer_collection_photos/')
-    
+    created_at = models.DateTimeField(auto_now_add=True)

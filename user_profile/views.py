@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
-from django.db.models import Count, Subquery, Q, Avg, DecimalField, Prefetch, ExpressionWrapper, F, IntegerField, Case, When, Value, BooleanField
+from django.db.models import Count, Subquery, Q, Avg, DecimalField, Prefetch, ExpressionWrapper, F, IntegerField, Case, When, Value, BooleanField, ImageField
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -10,12 +10,13 @@ from rest_framework.validators import ValidationError
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.response import Response
 
-from .serializers import TrainerListSerializer, PostSerializer, ProfileTrainerSerializer, CertyficationTrainerSerializer, TrainerFullProfileSerializer
-from .models import TrainerPost, TrainerProfile, CertyficationTrainer, TrainerImages
+from .serializers import TrainerListSerializer, PostSerializer, ProfileTrainerSerializer, CertyficationTrainerSerializer, TrainerFullProfileSerializer, PhotosCollectionSerializer
+from .models import TrainerPost, TrainerProfile, CertyficationTrainer, TrainerImages, PhotosCollection
 from .permissions import OnlyOwnerOfProfileCanModify, OnlyOnwerOfTrainerProfile
 from event.models import Event
 from .utils import *
 from event.serializers import NoneSerializer
+
 
 class TrainerPostViewSet(viewsets.ModelViewSet):
     serializer_class = PostSerializer
@@ -139,3 +140,34 @@ class RevokeObservationView(GenericAPIView):
             return Response({"error": "You are not observing this trainer", "code": "have_not_observation"},status=status.HTTP_400_BAD_REQUEST)
         
         return Response({"success": "Observation revoked", "code": "obs_revoke_success"}, status=status.HTTP_200_OK)
+
+
+class PhotosCollectionViewSet(viewsets.ModelViewSet):
+    serializer_class = PhotosCollectionSerializer
+
+    def get_queryset(self):
+        trainer_id_param = self.request.query_params.get('trainer_id')
+        if not trainer_id_param:
+            return Response({"E"})
+        trainer = get_object_or_404(TrainerProfile, pk=trainer_id_param)
+
+        latest_photo = TrainerImages.objects.filter(
+            photoscollections=OuterRef('pk')
+        ).order_by('-created_at').values('images')[:1]
+
+        collection = (
+            PhotosCollection.objects
+            .filter(trainer=trainer)
+            .annotate(
+                img_count=Count('images', distinct=True),
+                first_img=Subquery(latest_photo)
+            )
+        )
+
+        return collection
+    
+    def perform_create(self, serializer):
+        trainer = self.request.user.profile.trainerprofile
+        serializer.save(trainer=trainer)
+
+

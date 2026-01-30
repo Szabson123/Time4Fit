@@ -7,4 +7,4 @@ class OnlyOwnerOfProfileCanModify(BasePermission):
     
 class OnlyOnwerOfTrainerProfile(BasePermission):
     def has_object_permission(self, request, view, obj):
-        return obj.trainerprofile.profile.user == request.user
+        return obj.trainer.profile.user == request.user

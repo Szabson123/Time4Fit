@@ -146,26 +146,28 @@ class PhotosCollectionViewSet(viewsets.ModelViewSet):
     serializer_class = PhotosCollectionSerializer
 
     def get_queryset(self):
-        trainer_id_param = self.request.query_params.get('trainer_id')
-        if not trainer_id_param:
-            return Response({"E"})
-        trainer = get_object_or_404(TrainerProfile, pk=trainer_id_param)
-
-        latest_photo = TrainerImages.objects.filter(
+        latest_photo_sq = TrainerImages.objects.filter(
             photoscollections=OuterRef('pk')
         ).order_by('-created_at').values('images')[:1]
 
-        collection = (
-            PhotosCollection.objects
-            .filter(trainer=trainer)
-            .annotate(
-                img_count=Count('images', distinct=True),
-                first_img=Subquery(latest_photo)
-            )
+        qs = PhotosCollection.objects.annotate(
+            img_count=Count('images', distinct=True),
+            first_img=Subquery(latest_photo_sq)
         )
 
-        return collection
-    
+        trainer_id_param = self.request.query_params.get('trainer_id')
+
+        if trainer_id_param:
+            return qs.filter(trainer_id=trainer_id_param)
+
+        user = self.request.user
+        if user.is_authenticated and hasattr(user, 'profile'):
+            return qs.filter(trainer=user.profile.trainerprofile)
+
+        raise ValidationError(
+            {"error": "You need to pass trainer_id query param.", "code": "no_trainer_id"}
+        )
+
     def perform_create(self, serializer):
         trainer = self.request.user.profile.trainerprofile
         serializer.save(trainer=trainer)

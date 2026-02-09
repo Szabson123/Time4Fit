@@ -4,6 +4,7 @@ from django.db.models import Prefetch
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.filters import SearchFilter
 
 from .serializers import ProductCategorySerializer, ProductCreateSerializer, ProductListSerializer
 from .models import Product, Allergen
@@ -23,6 +24,9 @@ class ListMyProductView(generics.ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = CustomPagination
+    filter_backends = [SearchFilter]
+
+    search_fields = ['title', 'category__name', 'barcode', 'allergens__name']
 
     def get_queryset(self):
         return (Product.objects

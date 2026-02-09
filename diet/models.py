@@ -1,6 +1,6 @@
 from django.db import models
 from user.models import CentralUser
-
+from decimal import Decimal, ROUND_HALF_UP
 
 class ProductCategory(models.Model):
     name = models.CharField(max_length=255)
@@ -32,6 +32,25 @@ class Product(models.Model):
 
     barcode = models.CharField(max_length=255, db_index=True)
     image = models.ImageField(upload_to='products_images/', blank=True, null=True)
+
+    @property
+    def display_nutrients(self):
+        multiplier = self.packaging_size if self.packaging_size else Decimal('100.00')
+
+        if self.label_type == 'US':
+            sodium_mg = (self.salt_1g / Decimal('2.5')) * Decimal('1000') * multiplier
+            salt_value = sodium_mg.quantize(Decimal('1.0'), rounding=ROUND_HALF_UP)
+
+        else:
+            salt_value = (self.salt_1g * multiplier).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)
+
+        return {
+            'kcal': (self.kcal_1g * multiplier).quantize(Decimal('1'), rounding=ROUND_HALF_UP),
+            'protein': (self.protein_1g * multiplier).quantize(Decimal('1.0'), rounding=ROUND_HALF_UP),
+            'fat': (self.fat_1g * multiplier).quantize(Decimal('1.0'), rounding=ROUND_HALF_UP),
+            'carbohydrates': (self.carbohydrates_1g * multiplier).quantize(Decimal('1.0'), rounding=ROUND_HALF_UP),
+            'sodium_salt': salt_value
+        }
     
 
 class Allergen(models.Model):

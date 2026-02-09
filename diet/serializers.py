@@ -71,3 +71,18 @@ class ProductCreateSerializer(serializers.ModelSerializer):
             Allergen.objects.bulk_create(allergen_instances)
 
         return product
+    
+
+class ProductListSerializer(serializers.ModelSerializer):
+    category = serializers.CharField(source='category.name')
+    packaging_type = serializers.CharField(source='packaging_type.name')
+    nutrients = serializers.ReadOnlyField(source='display_nutrients')
+    allergens = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'title', 'label_type', 'category', 'packaging_type', 
+            'packaging_size', 'packaging_metric', 'barcode', 
+            'allergens', 'nutrients'
+        ]

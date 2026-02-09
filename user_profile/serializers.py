@@ -28,7 +28,7 @@ class PostSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TrainerPost
-        fields = ["id", "description", "likes", "images", "uploaded_images", "date"]
+        fields = ["id", "title", "description", "likes", "images", "uploaded_images", "date"]
         read_only_fields = ['likes', "date"]
 
     def create(self, validated_data):

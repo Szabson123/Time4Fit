@@ -70,6 +70,7 @@ class CertificationFile(models.Model):
 class TrainerPost(models.Model):
     trainer = models.ForeignKey(TrainerProfile, on_delete=models.CASCADE, related_name='posts')
     date = models.DateTimeField(auto_now_add=True)
+    title = models.CharField(max_length=255, null=True, blank=True)
     description = models.CharField(max_length=2000)
     likes = models.PositiveIntegerField(default=0)
 

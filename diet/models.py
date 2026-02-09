@@ -25,7 +25,6 @@ class Product(models.Model):
     fat_1g = models.DecimalField(max_digits=12, decimal_places=5)
     carbohydrates_1g = models.DecimalField(max_digits=12, decimal_places=5)
     salt_1g = models.DecimalField(max_digits=12, decimal_places=5, default=0)
-    fiber_1g = models.DecimalField(max_digits=12, decimal_places=5, default=0) # Ważne dla USA
 
     packaging_type = models.ForeignKey(Packaging, on_delete=models.CASCADE) #US/EU
     packaging_size = models.DecimalField(max_digits=8, decimal_places=2, default=100.00) #US -> required EU -> Not requred

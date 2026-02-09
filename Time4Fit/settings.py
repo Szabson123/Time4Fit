@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'event',
     'subscription',
     'training_plan',
+    'diet',
 
     'drf_spectacular',
     'rest_framework',

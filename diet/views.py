@@ -19,9 +19,7 @@ class CategoryHelper(generics.ListAPIView):
 
 class AllergensHelper(generics.ListAPIView):
     serializer_class = AllergenSerializer
-
-    def get_queryset(self):
-        return Allergen.objects.filter(product__user=self.request.user).distinct('name').order_by('name')
+    queryset = Allergen.objects.all()
 
 
 class CustomPagination(PageNumberPagination):

@@ -64,5 +64,5 @@ class Product(models.Model):
 
 class Allergen(models.Model):
     name = models.CharField(max_length=255, db_index=True)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='allergens')
+    product = models.ManyToManyField(Product, related_name='allergens')
 

@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from django.db.models import Prefetch
+from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField
+from django.db.models.functions import Coalesce
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics, status
@@ -40,17 +41,15 @@ class ListMyProductView(generics.ListAPIView):
     filter_backends = [SearchFilter, OrderingFilter]
 
     search_fields = ['title', 'category__name', 'barcode', 'allergens__name']
-    ordering_fields = ['kcal_1g', 'protein_1g', 'fat_1g', 'carbohydrates_1g', 'salt_1g']
+    ordering_fields = ['total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates', 'display_salt']
 
     def get_queryset(self):
         return (Product.objects
                 .filter(user=self.request.user)
+                .with_nutrients()
                 .select_related('category', 'packaging_type')
                 .prefetch_related(
                     Prefetch(
-                        'allergens', 
-                        queryset=Allergen.objects.only('name')
-                    )
-                ))
-    
-
+                        'allergens',
+                        Allergen.objects.only('name')
+                    )))

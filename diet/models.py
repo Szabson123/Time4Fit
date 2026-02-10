@@ -1,6 +1,13 @@
 from django.db import models
+from django.db.models import F, ExpressionWrapper, DecimalField, Case, When, Value
+from django.db.models.functions import Coalesce
 from user.models import CentralUser
 from decimal import Decimal, ROUND_HALF_UP
+
+
+class ProductCountry(models.Model):
+    name = models.CharField(max_length=255)
+
 
 class ProductCategory(models.Model):
     name = models.CharField(max_length=255)
@@ -10,6 +17,25 @@ class Packaging(models.Model):
     name = models.CharField(max_length=255)
     default_size = models.CharField()
     default_metric = models.CharField()
+
+
+class ProductQuerySet(models.QuerySet):
+    def with_nutrients(self):
+        multiplier = Coalesce(F('packaging_size'), Value(100.0))
+
+        return self.annotate(
+            total_kcal = ExpressionWrapper(F('kcal_1g') * multiplier, output_field=DecimalField()),
+            total_protein = ExpressionWrapper(F('protein_1g') * multiplier, output_field=DecimalField()),
+            total_fat = ExpressionWrapper(F('fat_1g') * multiplier, output_field=DecimalField()),
+            total_carbohydrates = ExpressionWrapper(F('carbohydrates_1g') * multiplier, output_field=DecimalField()),
+            display_salt=Case(
+                When(label_type='US', then=ExpressionWrapper(
+                    (F('salt_1g') / 2.5) * 1000 * multiplier, output_field=DecimalField()
+                )),
+                default=ExpressionWrapper(F('salt_1g') * multiplier, output_field=DecimalField()),
+                output_field=DecimalField()
+            )
+        )
 
 
 class Product(models.Model):
@@ -33,25 +59,8 @@ class Product(models.Model):
     barcode = models.CharField(max_length=255, db_index=True)
     image = models.ImageField(upload_to='products_images/', blank=True, null=True)
 
-    @property
-    def display_nutrients(self):
-        multiplier = self.packaging_size if self.packaging_size else Decimal('100.00')
+    objects = ProductQuerySet.as_manager()
 
-        if self.label_type == 'US':
-            sodium_mg = (self.salt_1g / Decimal('2.5')) * Decimal('1000') * multiplier
-            salt_value = sodium_mg.quantize(Decimal('1.0'), rounding=ROUND_HALF_UP)
-
-        else:
-            salt_value = (self.salt_1g * multiplier).quantize(Decimal('1.00'), rounding=ROUND_HALF_UP)
-
-        return {
-            'kcal': (self.kcal_1g * multiplier).quantize(Decimal('1'), rounding=ROUND_HALF_UP),
-            'protein': (self.protein_1g * multiplier).quantize(Decimal('1.0'), rounding=ROUND_HALF_UP),
-            'fat': (self.fat_1g * multiplier).quantize(Decimal('1.0'), rounding=ROUND_HALF_UP),
-            'carbohydrates': (self.carbohydrates_1g * multiplier).quantize(Decimal('1.0'), rounding=ROUND_HALF_UP),
-            'sodium_salt': salt_value
-        }
-    
 
 class Allergen(models.Model):
     name = models.CharField(max_length=255, db_index=True)

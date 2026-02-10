@@ -76,7 +76,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 class ProductListSerializer(serializers.ModelSerializer):
     category = serializers.CharField(source='category.name')
     packaging_type = serializers.CharField(source='packaging_type.name')
-    nutrients = serializers.ReadOnlyField(source='display_nutrients')
+    nutrients = serializers.SerializerMethodField()
     allergens = serializers.SlugRelatedField(many=True, read_only=True, slug_field='name')
 
     class Meta:
@@ -86,3 +86,12 @@ class ProductListSerializer(serializers.ModelSerializer):
             'packaging_size', 'packaging_metric', 'barcode', 
             'allergens', 'nutrients'
         ]
+
+    def get_nutrients(self, obj):
+        return {
+            'kcal': round(getattr(obj, 'total_kcal', 0)),
+            'protein': round(getattr(obj, 'total_protein', 0), 1),
+            'fat': round(getattr(obj, 'total_fat', 0), 1),
+            'carbohydrates': round(getattr(obj, 'total_carbs', 0), 1),
+            'sodium_salt': round(getattr(obj, 'display_salt', 0), 2),
+        }

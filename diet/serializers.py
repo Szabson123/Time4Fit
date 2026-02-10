@@ -37,24 +37,41 @@ class ProductCreateSerializer(serializers.ModelSerializer):
                     'kcal', 'protein', 'fat', 'carbohydrates', 'sodium_salt']
         
     def validate(self, attrs):
-        label_type = attrs.get('label_type')
+        instance_label_type = getattr(self.instance, 'label_type', None)
+        label_type = attrs.get('label_type', instance_label_type)
+
         if not label_type:
             raise serializers.ValidationError({"label_type": "Label type is required."})
             
-        if label_type == 'US' and not attrs.get('packaging_size'):
-            raise serializers.ValidationError({"packaging_size": "Packaging size is required for US serving-based labels."})
+        instance_size = getattr(self.instance, 'packaging_size', None)
+        packaging_size = attrs.get('packaging_size', instance_size)
+
+        if label_type == 'US' and not packaging_size:
+            raise serializers.ValidationError({
+                "packaging_size": "Packaging size is required for US serving-based labels."
+            })
+            
         return attrs
 
     def create(self, validated_data):
-            user = self.context['request'].user
-            allergens = validated_data.pop("allergens", [])
+        user = self.context['request'].user
+        allergens = validated_data.pop("allergens", [])
 
-            product = ProductService.create_product(user, validated_data)
+        product = ProductService.create_product(user, validated_data)
 
-            if allergens:
-                product.allergens.set(allergens)
+        if allergens:
+            product.allergens.set(allergens)
 
-            return product
+        return product
+    
+    def update(self, instance, validated_data):
+        allergens = validated_data.pop("allergens", None)
+        product = ProductService.update_product(instance, validated_data)
+
+        if allergens is not None:
+            product.allergens.set(allergens)
+
+        return product
     
 
 class ProductListSerializer(serializers.ModelSerializer):

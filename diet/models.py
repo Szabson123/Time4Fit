@@ -66,3 +66,7 @@ class Allergen(models.Model):
     name = models.CharField(max_length=255, db_index=True)
     product = models.ManyToManyField(Product, related_name='allergens')
 
+
+class Dish(models.Model):
+    author = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
+    

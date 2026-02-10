@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from .serializers import ProductCategorySerializer, ProductCreateSerializer, ProductListSerializer, AllergenSerializer
 from .models import Product, Allergen, ProductCategory
 from .filters import SmartHybridSearchFilter
+from .permissions import IsProductOwner
 
 
 class CategoryHelper(generics.ListAPIView):
@@ -35,7 +36,7 @@ class CreateProductView(generics.CreateAPIView):
 
 class ListMyProductView(generics.ListAPIView):
     serializer_class = ProductListSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsProductOwner]
     pagination_class = CustomPagination
     
     filter_backends = [SmartHybridSearchFilter, OrderingFilter]
@@ -54,3 +55,23 @@ class ListMyProductView(generics.ListAPIView):
                     ))
                 # .distinct() jest już w filtrze, ale tutaj nie zaszkodzi
                 .distinct())
+    
+
+class RetrieveMyProductView(generics.RetrieveAPIView):
+    serializer_class = ProductListSerializer
+    queryset = Product.objects.all().with_nutrients()
+    permission_classes = [IsAuthenticated, IsProductOwner]
+    lookup_url_kwarg = 'id'
+
+
+class UpdateMyProductView(generics.UpdateAPIView):
+    serializer_class = ProductCreateSerializer
+    queryset = Product.objects.all().with_nutrients()
+    permission_classes = [IsAuthenticated, IsProductOwner]
+    lookup_url_kwarg = 'id'
+
+
+class DeleteMyProductView(generics.DestroyAPIView):
+    permission_classes = [IsAuthenticated, IsProductOwner]
+    queryset = Product.objects.all().with_nutrients()
+    lookup_url_kwarg = 'id'

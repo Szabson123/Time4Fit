@@ -28,11 +28,7 @@ class ProductCreateSerializer(serializers.ModelSerializer):
     fat = serializers.DecimalField(decimal_places=5, max_digits=12, write_only=True)
     carbohydrates = serializers.DecimalField(decimal_places=5, max_digits=12, write_only=True)
     sodium_salt = serializers.DecimalField(decimal_places=5, max_digits=12, write_only=True)
-    allergens = serializers.PrimaryKeyRelatedField(
-            queryset=Allergen.objects.all(), 
-            many=True, 
-            required=False
-        )
+    allergens = serializers.PrimaryKeyRelatedField(queryset=Allergen.objects.all(), many=True, required=False)
 
     class Meta:
         model = Product

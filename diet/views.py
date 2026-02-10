@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from .serializers import ProductCategorySerializer, ProductCreateSerializer, ProductListSerializer, AllergenSerializer
 from .models import Product, Allergen, ProductCategory
+from .filters import SmartHybridSearchFilter
 
 
 class CategoryHelper(generics.ListAPIView):
@@ -36,9 +37,9 @@ class ListMyProductView(generics.ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = CustomPagination
-    filter_backends = [SearchFilter, OrderingFilter]
+    
+    filter_backends = [SmartHybridSearchFilter, OrderingFilter]
 
-    search_fields = ['title', 'category__name', 'barcode', 'allergens__name']
     ordering_fields = ['total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates', 'display_salt']
 
     def get_queryset(self):
@@ -50,4 +51,6 @@ class ListMyProductView(generics.ListAPIView):
                     Prefetch(
                         'allergens',
                         Allergen.objects.only('name')
-                    )))
+                    ))
+                # .distinct() jest już w filtrze, ale tutaj nie zaszkodzi
+                .distinct())

@@ -57,21 +57,12 @@ class ListMyProductView(generics.ListAPIView):
                 .distinct())
     
 
-class RetrieveMyProductView(generics.RetrieveAPIView):
-    serializer_class = ProductListSerializer
+class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all().with_nutrients()
     permission_classes = [IsAuthenticated, IsProductOwner]
     lookup_url_kwarg = 'id'
 
-
-class UpdateMyProductView(generics.UpdateAPIView):
-    serializer_class = ProductCreateSerializer
-    queryset = Product.objects.all().with_nutrients()
-    permission_classes = [IsAuthenticated, IsProductOwner]
-    lookup_url_kwarg = 'id'
-
-
-class DeleteMyProductView(generics.DestroyAPIView):
-    permission_classes = [IsAuthenticated, IsProductOwner]
-    queryset = Product.objects.all().with_nutrients()
-    lookup_url_kwarg = 'id'
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return ProductListSerializer
+        return ProductCreateSerializer

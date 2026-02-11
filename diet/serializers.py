@@ -55,23 +55,10 @@ class ProductCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        allergens = validated_data.pop("allergens", [])
+        return ProductService.create_product(user, validated_data)
 
-        product = ProductService.create_product(user, validated_data)
-
-        if allergens:
-            product.allergens.set(allergens)
-
-        return product
-    
     def update(self, instance, validated_data):
-        allergens = validated_data.pop("allergens", None)
-        product = ProductService.update_product(instance, validated_data)
-
-        if allergens is not None:
-            product.allergens.set(allergens)
-
-        return product
+        return ProductService.update_product(instance, validated_data)
     
 
 class ProductListSerializer(serializers.ModelSerializer):

@@ -32,14 +32,24 @@ class ProductService:
 
     @classmethod
     def create_product(cls, user, validated_data):
+        allergens = validated_data.pop('allergens', [])
+        
         label_type = validated_data.get('label_type')
         packaging_size = validated_data.get('packaging_size')
         
         processed_data = cls._prepare_nutrition_data(validated_data, label_type, packaging_size)
-        return Product.objects.create(user=user, **processed_data)
-
+        
+        product = Product.objects.create(user=user, **processed_data)
+        
+        if allergens:
+            product.allergens.set(allergens)
+            
+        return product
+    
     @classmethod
     def update_product(cls, instance, validated_data):
+        allergens = validated_data.pop('allergens', None)
+        
         label_type = validated_data.get('label_type', instance.label_type)
         packaging_size = validated_data.get('packaging_size', instance.packaging_size)
 
@@ -49,4 +59,8 @@ class ProductService:
             setattr(instance, attr, value)
         
         instance.save()
+
+        if allergens is not None:
+            instance.allergens.set(allergens)
+
         return instance

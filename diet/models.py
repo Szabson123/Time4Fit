@@ -13,6 +13,14 @@ class ProductCategory(models.Model):
     name = models.CharField(max_length=255)
 
 
+class DishCategory(models.Model):
+    name = models.CharField(max_length=255)
+
+
+class DietType(models.Model):
+    name = models.CharField(max_length=255)
+
+
 class Packaging(models.Model):
     name = models.CharField(max_length=255)
     default_size = models.CharField()
@@ -36,6 +44,14 @@ class ProductQuerySet(models.QuerySet):
                 output_field=DecimalField()
             )
         )
+    def with_allergens(self):
+        return self.annotate(
+            all_allergens = Allergen.objects.filter()
+        )
+
+
+class Allergen(models.Model):
+    name = models.CharField(max_length=255, db_index=True)
 
 
 class Product(models.Model):
@@ -44,6 +60,7 @@ class Product(models.Model):
     user = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255, db_index=True)
     category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE, related_name='products')
+    allergens = models.ManyToManyField(Allergen, related_name='products')
 
     # In USA we put kcal per serving in EU per 100g then endpoint/service make logic 
     kcal_1g = models.DecimalField(max_digits=12, decimal_places=5)
@@ -58,15 +75,20 @@ class Product(models.Model):
 
     barcode = models.CharField(max_length=255, db_index=True)
     image = models.ImageField(upload_to='products_images/', blank=True, null=True)
+    countries = models.ManyToManyField(ProductCountry, related_name='products')
 
     objects = ProductQuerySet.as_manager()
 
 
-class Allergen(models.Model):
-    name = models.CharField(max_length=255, db_index=True)
-    product = models.ManyToManyField(Product, related_name='allergens')
-
-
 class Dish(models.Model):
     author = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
-    
+    name = models.CharField(max_length=255)
+
+    product = models.ManyToManyField(Product, related_name='dishes')
+    category = models.ForeignKey(DishCategory, on_delete=models.SET_NULL, null=True)
+    diet_type = models.ForeignKey(DietType, on_delete=models.SET_NULL, null=True, blank=True)
+
+    recipe = models.JSONField(default=dict)
+    additional_allergens = models.ManyToManyField(Allergen, related_name='dishes')
+    img = models.ImageField(upload_to='dishes_images/', blank=True, null=True)
+

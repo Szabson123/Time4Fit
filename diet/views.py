@@ -8,8 +8,8 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 
-from .serializers import ProductCategorySerializer, ProductCreateSerializer, ProductListSerializer, AllergenSerializer
-from .models import Product, Allergen, ProductCategory
+from .serializers import ProductCategorySerializer, DishSerializer, ProductCreateSerializer, ProductListSerializer, AllergenSerializer, DishCreateSerializer
+from .models import Product, Allergen, ProductCategory, Dish
 from .filters import SmartHybridSearchFilter
 from .permissions import IsProductOwner
 
@@ -66,3 +66,19 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method == 'GET':
             return ProductListSerializer
         return ProductCreateSerializer
+    
+
+class MyDishesListView(generics.ListAPIView):
+    serializer_class = DishSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Dish.objects.filter(author=self.request.user)
+    
+
+class CreateMyDish(generics.CreateAPIView):
+    serializer_class = DishCreateSerializer
+    queryset = Dish.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)

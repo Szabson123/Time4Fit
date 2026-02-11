@@ -1,6 +1,7 @@
 from rest_framework import serializers
+from django.db import transaction
 
-from .models import Packaging, ProductCategory, Product, Allergen
+from .models import Packaging, DishIngredient, ProductCategory, Product, Allergen, Dish
 from .services import ProductService
 
 
@@ -83,3 +84,60 @@ class ProductListSerializer(serializers.ModelSerializer):
             'carbohydrates': round(getattr(obj, 'total_carbs', 0), 1),
             'sodium_salt': round(getattr(obj, 'display_salt', 0), 2),
         }
+    
+
+class DishSerializer(serializers.ModelSerializer):
+    category = serializers.CharField(source='category.name')
+    diet_type = serializers.CharField(source='diet_type.name')
+
+    class Meta:
+        model = Dish
+        fields = ['id', 'name', 'category', 'diet_type']
+
+
+class DishIngredientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DishIngredient
+        fields = ['product', 'name_packaging', 'ammount', 'weight_in_g']
+
+
+class DishCreateSerializer(serializers.ModelSerializer):
+    ingredients = DishIngredientSerializer(many=True)
+    additional_allergens = serializers.PrimaryKeyRelatedField(many=True, queryset=Allergen.objects.all(), required=False)
+
+    class Meta:
+        model = Dish
+        fields = ['name', 'category', 'diet_type', 'recipe', 'ingredients', 'additional_allergens']
+
+    @transaction.atomic
+    def create(self, validated_data):
+        ingredients_data = validated_data.pop('ingredients')
+        allergens_data = validated_data.pop('additional_allergens', [])
+
+        dish = Dish.objects.create(**validated_data)
+
+        dish.additional_allergens.set(allergens_data)
+        
+        for ingredient_data in ingredients_data:
+            DishIngredient.objects.create(dish=dish, **ingredient_data)
+
+        return dish
+    
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        ingredients_data = validated_data.pop('ingredients', None)
+        allergens_data = validated_data.pop('additional_allergens', [])
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if allergens_data is not None:
+            instance.additional_allergens.set(allergens_data)
+
+        if ingredients_data is not None:
+            instance.ingredients.all().delete()
+            for ingredient_data in ingredients_data:
+                DishIngredient.objects.create(dish=instance, **ingredient_data)
+
+        return instance

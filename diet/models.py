@@ -3,7 +3,7 @@ from django.db.models import F, ExpressionWrapper, DecimalField, Case, When, Val
 from django.db.models.functions import Coalesce
 from user.models import CentralUser
 from decimal import Decimal, ROUND_HALF_UP
-
+from django.core.exceptions import ValidationError
 
 class ProductCountry(models.Model):
     name = models.CharField(max_length=255)
@@ -44,10 +44,9 @@ class ProductQuerySet(models.QuerySet):
                 output_field=DecimalField()
             )
         )
+    
     def with_allergens(self):
-        return self.annotate(
-            all_allergens = Allergen.objects.filter()
-        )
+        return self.prefetch_related('allergens')
 
 
 class Allergen(models.Model):
@@ -84,11 +83,30 @@ class Dish(models.Model):
     author = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
 
-    product = models.ManyToManyField(Product, related_name='dishes')
+    product = models.ManyToManyField(Product, related_name='dishes', through='DishIngredient')
     category = models.ForeignKey(DishCategory, on_delete=models.SET_NULL, null=True)
     diet_type = models.ForeignKey(DietType, on_delete=models.SET_NULL, null=True, blank=True)
 
-    recipe = models.JSONField(default=dict)
+    recipe = models.JSONField(default=dict, null=True, blank=True)
     additional_allergens = models.ManyToManyField(Allergen, related_name='dishes')
     img = models.ImageField(upload_to='dishes_images/', blank=True, null=True)
 
+
+class DishIngredient(models.Model):
+    dish = models.ForeignKey(Dish, on_delete=models.CASCADE, related_name='ingredients')
+    product = models.ForeignKey('Product', on_delete=models.CASCADE)
+    name_packaging = models.CharField(default=None, null=True, blank=True)
+    ammount = models.DecimalField(max_digits=12, decimal_places=5, null=True, blank=True)
+    weight_in_g = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+
+    def clean(self):
+        super().clean()
+        if self.name_packaging:
+            if not Packaging.objects.filter(name=self.name_packaging).exists():
+                raise ValidationError({
+                    'error': f"Opakowanie '{self.name_packaging}' nie istnieje w bazie systemowej.", "code": 'packaging doesnt exist'
+                })
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

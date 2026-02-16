@@ -1,14 +1,16 @@
 from django.shortcuts import render
-from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField
+from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField, Sum, CharField
+from django.contrib.postgres.fields import ArrayField
 from django.db.models.functions import Coalesce
+from django.contrib.postgres.aggregates import ArrayAgg
 
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import generics, status
+from rest_framework import generics, status, viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
 
-from .serializers import ProductCategorySerializer, DishSerializer, ProductCreateSerializer, ProductListSerializer, AllergenSerializer, DishCreateSerializer
+from .serializers import ProductCategorySerializer, DishSerializer, ProductCreateSerializer, ProductListSerializer, AllergenSerializer, DishCreateSerializer, RetriveDishSerializer
 from .models import Product, Allergen, ProductCategory, Dish
 from .filters import SmartHybridSearchFilter
 from .permissions import IsProductOwner
@@ -67,13 +69,29 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         return ProductCreateSerializer
     
 
-class MyDishesListView(generics.ListAPIView):
+class MyDishesListView(viewsets.ReadOnlyModelViewSet):
     serializer_class = DishSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return DishSerializer
+        if self.action == 'retrieve':
+            return RetriveDishSerializer
+
     def get_queryset(self):
-        return Dish.objects.select_related('category', 'diet_type').filter(author=self.request.user)
-    
+        return (Dish.objects
+                .filter(author=self.request.user)
+                .select_related('category', 'diet_type')
+                .annotate(
+                    total_kcal=Sum(F('ingredients__weight_in_g') * F('ingredients__product__kcal_1g'), distinct=True),
+                    total_protein=Sum(F('ingredients__weight_in_g') * F('ingredients__product__protein_1g'), distinct=True),
+                    total_fat=Sum(F('ingredients__weight_in_g') * F('ingredients__product__fat_1g'), distinct=True),
+                    total_carbohydrates=Sum(F('ingredients__weight_in_g') * F('ingredients__product__carbohydrates_1g'), distinct=True),
+                    display_salt=Sum(F('ingredients__weight_in_g') * F('ingredients__product__salt_1g'), distinct=True),
+                    products_allergens=ArrayAgg('ingredients__product__allergens__name', distinct=True)
+                ))
+
 
 class CreateMyDish(generics.CreateAPIView):
     serializer_class = DishCreateSerializer
@@ -82,5 +100,3 @@ class CreateMyDish(generics.CreateAPIView):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
-
-# class DishDetailsView(generics.RetrieveUpdateDestroyAPIView):

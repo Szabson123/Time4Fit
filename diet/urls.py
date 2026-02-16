@@ -10,7 +10,8 @@ urlpatterns = [
     path('allergens-helper/', AllergensHelper.as_view(), name='alleregens-helper'),
     path('my-products/<int:id>/', ProductDetailView.as_view(), name='product-detail'),
 
-    path('my-dishes/', MyDishesListView.as_view(), name='my-dishes'),
+    path('my-dishes/', MyDishesListView.as_view({'get': 'list'}), name='my-dishes'),
+    path('my-dishes-retrieve/<int:pk>/', MyDishesListView.as_view({'get': 'retrieve'}), name='my-dishes'),
     path('create-dish/', CreateMyDish.as_view(), name='create-product'),
-    
+
 ]

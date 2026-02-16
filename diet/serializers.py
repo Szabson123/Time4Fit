@@ -1,6 +1,9 @@
 from rest_framework import serializers
 from django.db import transaction
 
+from django.db.models import CharField
+from django.contrib.postgres.fields import ArrayField
+
 from .models import Packaging, DishIngredient, ProductCategory, Product, Allergen, Dish
 from .services import ProductService
 
@@ -9,6 +12,14 @@ class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
         fields = ['id', 'name']
+
+
+
+class DishIngredientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DishIngredient
+        fields = ['product', 'name_packaging', 'ammount', 'weight_in_g']
+
 
 
 class PackagingSerializer(serializers.ModelSerializer):
@@ -90,15 +101,30 @@ class DishSerializer(serializers.ModelSerializer):
     category = serializers.CharField(source='category.name')
     diet_type = serializers.CharField(source='diet_type.name')
 
+    total_kcal = serializers.DecimalField(decimal_places=5, max_digits=12)
+    total_protein = serializers.DecimalField(decimal_places=5, max_digits=12)
+    total_fat = serializers.DecimalField(decimal_places=5, max_digits=12)
+    total_carbohydrates = serializers.DecimalField(decimal_places=5, max_digits=12)
+    display_salt = serializers.DecimalField(decimal_places=5, max_digits=12)
+
+    additional_allergens = AllergenSerializer(read_only=True, many=True)
+    products_allergens = serializers.ListField(child=serializers.CharField(), read_only=True)
+
     class Meta:
         model = Dish
-        fields = ['id', 'name', 'category', 'diet_type', 'recipe']
+        fields = ['id', 'name', 'category', 'diet_type',
+                  'total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates', 'display_salt',
+                  'additional_allergens', 'products_allergens']
+        
 
+class RetriveDishSerializer(serializers.ModelSerializer):
+    dish_ser = DishSerializer(source="*", many=False, read_only=True)
+    ingredients = DishIngredientSerializer(many=True, read_only=True)
 
-class DishIngredientSerializer(serializers.ModelSerializer):
     class Meta:
-        model = DishIngredient
-        fields = ['product', 'name_packaging', 'ammount', 'weight_in_g']
+        model = Dish
+        fields = ['dish_ser', 'recipe', 'img', 'ingredients']
+
 
 
 class DishCreateSerializer(serializers.ModelSerializer):

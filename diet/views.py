@@ -50,9 +50,8 @@ class ListMyProductView(generics.ListAPIView):
                 .select_related('category', 'packaging_type')
                 .prefetch_related(
                     Prefetch(
-                        'allergens',
-                        Allergen.objects.only('name')
-                    ))
+                        'allergens', Allergen.objects.only('name')),
+                        'countries')
                 # .distinct() jest już w filtrze, ale tutaj nie zaszkodzi
                 .distinct())
     
@@ -73,7 +72,7 @@ class MyDishesListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Dish.objects.filter(author=self.request.user)
+        return Dish.objects.select_related('category', 'diet_type').filter(author=self.request.user)
     
 
 class CreateMyDish(generics.CreateAPIView):
@@ -82,3 +81,6 @@ class CreateMyDish(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
+
+
+# class DishDetailsView(generics.RetrieveUpdateDestroyAPIView):

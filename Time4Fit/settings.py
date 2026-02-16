@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = os.getenv('SECRET_KEY')
+
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY is missing from environment variables!")
 
@@ -48,6 +49,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'querycount.middleware.QueryCountMiddleware',
 ]
 
 ROOT_URLCONF = 'Time4Fit.urls'

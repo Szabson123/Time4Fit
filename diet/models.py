@@ -80,7 +80,7 @@ class Product(models.Model):
 
 
 class Dish(models.Model):
-    author = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
 
     product = models.ManyToManyField(Product, related_name='dishes', through='DishIngredient')

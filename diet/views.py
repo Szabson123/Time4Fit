@@ -92,7 +92,7 @@ class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
         return ProductCreateSerializer
     
 
-class MyDishesListView(viewsets.ReadOnlyModelViewSet):
+class MyDishesListView(viewsets.ModelViewSet):
     serializer_class = DishSerializer
     permission_classes = [IsAuthenticated]
 
@@ -104,7 +104,7 @@ class MyDishesListView(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         return (Dish.objects
-                .filter(author=self.request.user)
+                .filter(user=self.request.user)
                 .select_related('category', 'diet_type')
                 .annotate(
                     total_kcal=Sum(F('ingredients__weight_in_g') * F('ingredients__product__kcal_1g'), distinct=True),
@@ -128,11 +128,21 @@ class MyDishesListView(viewsets.ReadOnlyModelViewSet):
                 ))
                 
 
-
 class CreateMyDish(generics.CreateAPIView):
     serializer_class = DishCreateSerializer
     queryset = Dish.objects.all()
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        serializer.save(user=self.request.user)
 
+
+class UpdateMyDish(generics.UpdateAPIView):
+    serializer_class = DishCreateSerializer
+    permission_classes = [IsAuthenticated, IsProductOwner]
+    queryset = Dish.objects.all()
+
+
+class DestroyMyDish(generics.DestroyAPIView):
+    serializer_class = DishCreateSerializer
+    permission_classes = [IsAuthenticated, IsProductOwner]
+    queryset = Dish.objects.all()

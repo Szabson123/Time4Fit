@@ -1,11 +1,11 @@
 from django.shortcuts import render
-from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField, Sum, CharField
+from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField, Sum, CharField, Q, Value
 from django.contrib.postgres.fields import ArrayField
 from django.db.models.functions import Coalesce
 from django.contrib.postgres.aggregates import ArrayAgg
 
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import generics, status, viewsets
+from rest_framework import generics, status, viewsets, mixins
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.response import Response
@@ -58,6 +58,29 @@ class ListMyProductView(generics.ListAPIView):
                 .distinct())
     
 
+class ListGlobalProducts(generics.ListAPIView):
+    serializer_class = ProductListSerializer
+    permission_classes = [IsAuthenticated, IsProductOwner]
+    pagination_class = CustomPagination
+    
+    filter_backends = [SmartHybridSearchFilter, OrderingFilter]
+
+    ordering_fields = ['total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates', 'display_salt']
+
+    # Dodać filtr jeszcze na kraj wybrany przez użytkownika/kod pocztowy/miasto cokolwiek
+    def get_queryset(self):
+        return (Product.objects
+                .filter(user__isnull=True)
+                .with_nutrients()
+                .select_related('category', 'packaging_type')
+                .prefetch_related(
+                    Prefetch(
+                        'allergens', Allergen.objects.only('name')),
+                        'countries')
+                # .distinct() jest już w filtrze, ale tutaj nie zaszkodzi
+                .distinct())
+    
+
 class ProductDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Product.objects.all().with_nutrients()
     permission_classes = [IsAuthenticated, IsProductOwner]
@@ -89,8 +112,21 @@ class MyDishesListView(viewsets.ReadOnlyModelViewSet):
                     total_fat=Sum(F('ingredients__weight_in_g') * F('ingredients__product__fat_1g'), distinct=True),
                     total_carbohydrates=Sum(F('ingredients__weight_in_g') * F('ingredients__product__carbohydrates_1g'), distinct=True),
                     display_salt=Sum(F('ingredients__weight_in_g') * F('ingredients__product__salt_1g'), distinct=True),
-                    products_allergens=ArrayAgg('ingredients__product__allergens__name', distinct=True)
+                    products_allergens = Coalesce(
+                        ArrayAgg(
+                            'ingredients__product__allergens__name', 
+                            distinct=True,
+                            filter=Q(ingredients__product__allergens__name__isnull=False)
+                        ),
+                        Value([], output_field=ArrayField(CharField()))
+                    ))
+                .prefetch_related(
+                    Prefetch(
+                        'additional_allergens',
+                        queryset=Allergen.objects.filter(name__isnull=False).distinct()
+                    )
                 ))
+                
 
 
 class CreateMyDish(generics.CreateAPIView):

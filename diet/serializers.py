@@ -126,7 +126,6 @@ class RetriveDishSerializer(serializers.ModelSerializer):
         fields = ['dish_ser', 'recipe', 'img', 'ingredients']
 
 
-
 class DishCreateSerializer(serializers.ModelSerializer):
     ingredients = DishIngredientSerializer(many=True)
     additional_allergens = serializers.PrimaryKeyRelatedField(many=True, queryset=Allergen.objects.all(), required=False)

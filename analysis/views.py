@@ -6,6 +6,8 @@ from faker import Faker
 from .models import ApplicationUser
 import time
 from PIL import Image, ImageDraw
+from user.tasks import async_generate_report_task
+
 
 class BulkCreateUsersView(APIView):
     def post(self, request, *args, **kwargs):
@@ -54,4 +56,29 @@ class SynchronousReportView(APIView):
         return Response(
             {"status": "Sukces", "message": "Raport wygenerowany i zapisany synchronicznie."}, 
             status=status.HTTP_200_OK
+        )
+    
+
+class AsynchronousReportView(APIView):
+    """
+    Punkt końcowy przyjmujący żądanie generowania raportu.
+    Dzięki integracji z Celery i Redis, widok działa w sposób nieblokujący.
+    """
+    def post(self, request):
+        # Pobranie identyfikatora użytkownika z payloadu żądania
+        user_id = request.data.get('user_id', 1)
+        
+        # Przekazanie zadania do brokera wiadomości (Redis).
+        # Operacja trwa ułamek milisekundy – instrukcja zostaje zakolejkowana.
+        async_generate_report_task.delay(user_id)
+        
+        # Natychmiastowy zwrot statusu HTTP 202 Accepted.
+        # Informujemy klienta, że zlecenie zostało przyjęte, a proces roboczy
+        # serwera Gunicorn zostaje w tym momencie całkowicie zwolniony.
+        return Response(
+            {
+                "status": "Accepted",
+                "message": "Zlecenie generowania raportu zostało przyjęte do realizacji w tle."
+            }, 
+            status=status.HTTP_202_ACCEPTED
         )

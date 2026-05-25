@@ -4,5 +4,6 @@ from django.urls import path
 
 urlpatterns = [
     path('create-users-bulk/', BulkCreateUsersView.as_view(), name='change-part-role'),
-    path('report-view/', SynchronousReportView.as_view(), name='report-view')
+    path('report-view/', SynchronousReportView.as_view(), name='report-view'),
+    path('report-async-view/', AsynchronousReportView.as_view(), name='report-view')
 ]

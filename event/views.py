@@ -21,7 +21,7 @@ from .serializers import( EventSerializer, EventInvitationCreateSerializer, Even
 from .models import Event, Category, EventParticipant, EventInvitation, PARTICIPANT_ROLES, EventAdditionalInfo
 from .permissions import IsEventAuthor, IsAuthorOrReadOnly
 from .filters import EventListFilter
-
+from user.tasks import async_generate_report_task
 
 class CustomPagination(PageNumberPagination):
     page_size = 20

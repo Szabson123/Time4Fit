@@ -7,6 +7,7 @@ import random, string
 from decimal import Decimal
 from django.db import transaction
 
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category

@@ -13,5 +13,4 @@ urlpatterns = [
 
     path('event/', include('event.urls')),
     path('user_profile/', include('user_profile.urls')),
-    path('analysis/', include('analysis.urls'))
 ]

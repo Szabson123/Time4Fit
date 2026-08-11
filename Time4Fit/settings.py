@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'storages',
+    'modeltranslation',
 ]
 
 MIDDLEWARE = [
@@ -201,3 +202,14 @@ AWS_S3_REGION_NAME = "auto"
 AWS_S3_SIGNATURE_VERSION = "s3v4"
 AWS_S3_ADDRESSING_STYLE = "path"
 AWS_DEFAULT_ACL = None
+
+
+LANGUAGES = (
+    ('pl', 'Polish'),
+    ('en', 'English'),
+    ('de', 'German'),
+    ('fr', 'French'),
+    ('es', 'Spanish'),
+)
+
+USE_I18N = True

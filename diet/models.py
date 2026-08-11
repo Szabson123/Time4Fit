@@ -111,3 +111,39 @@ class DishIngredient(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class DailyMealCalendar(models.Model):
+    user = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
+    date = models.DateField()
+
+    class Meta:
+        unique_together = ('user', 'date')
+
+
+class MealCategory(models.Model):
+    calendar = models.ForeignKey(DailyMealCalendar, on_delete=models.CASCADE, related_name='meals')
+    name = models.CharField(max_length=100) # np. "Śniadanie", "Przekąska po treningu"
+    order = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        ordering = ['order']
+
+
+class MealItem(models.Model):
+    meal_category = models.ForeignKey(MealCategory, on_delete=models.CASCADE, related_name='items')
+    
+    name = models.CharField(max_length=255)
+    amount_g = models.FloatField(help_text="Waga w gramach lub mililitrach")
+    
+    kcal_1g = models.DecimalField(max_digits=12, decimal_places=5)
+    protein_1g = models.DecimalField(max_digits=12, decimal_places=5)
+    fat_1g = models.DecimalField(max_digits=12, decimal_places=5)
+    carbohydrates_1g = models.DecimalField(max_digits=12, decimal_places=5)
+    salt_1g = models.DecimalField(max_digits=12, decimal_places=5, default=0)
+
+    packaging_type = models.ForeignKey(Packaging, on_delete=models.CASCADE)
+    packaging_size = models.DecimalField(max_digits=8, decimal_places=2, default=100.00)
+
+    original_product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
+    original_recipe = models.ForeignKey('Dish', on_delete=models.SET_NULL, null=True, blank=True)

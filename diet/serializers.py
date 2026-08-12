@@ -4,7 +4,7 @@ from django.db import transaction
 from django.db.models import CharField
 from django.contrib.postgres.fields import ArrayField
 
-from .models import Packaging, DishIngredient, ProductCategory, Product, Allergen, Dish
+from .models import Packaging, DishIngredient, ProductCategory, Product, Allergen, Dish, MealItem, MealCategory, FullMeal
 from .services import ProductService
 
 
@@ -166,3 +166,43 @@ class DishCreateSerializer(serializers.ModelSerializer):
                 DishIngredient.objects.create(dish=instance, **ingredient_data)
 
         return instance
+
+
+class MealItemSerializer(serializers.ModelSerializer):
+    total_kcal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_protein = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_fat = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_carbohydrates = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = MealItem
+        fields = [
+            'id', 'name', 'amount_g', 
+            'total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates'
+        ]
+
+class FullMealSerializer(serializers.ModelSerializer):
+    products = MealItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = FullMeal
+        fields = ['id', 'name', 'portion', 'products']
+
+
+class MealCategorySerializer(serializers.ModelSerializer):
+    items = serializers.SerializerMethodMethod(method_name='get_standalone_items')
+    fullmeal = FullMealSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = MealCategory
+        fields = ['id', 'name', 'order', 'fullmeal', 'items']
+
+    def get_standalone_items(self, obj):
+        standalone = [item for item in obj.items.all() if item.full_meal_id is None]
+        return MealItemSerializer(standalone, many=True).data
+
+
+class DailySummarySerializer(serializers.Serializer):
+    date = serializers.DateField(source='calendar.date')
+    totals = serializers.DictField()
+    categories = MealCategorySerializer(source='calendar.meals', many=True)

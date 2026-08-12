@@ -4,6 +4,7 @@ from django.db.models.functions import Coalesce
 from user.models import CentralUser
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
+from typing import List
 
 
 class ProductCountry(models.Model):
@@ -48,6 +49,25 @@ class ProductQuerySet(models.QuerySet):
     
     def with_allergens(self):
         return self.prefetch_related('allergens')
+
+
+class MealItemQuerySet(models.QuerySet):
+    def with_nutrients(self):
+        multiplier = Coalesce(F('amount_g'), Value(0.0), output_field=DecimalField())
+
+        return self.annotate(
+            total_kcal=ExpressionWrapper(F('kcal_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            total_protein=ExpressionWrapper(F('protein_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            total_fat=ExpressionWrapper(F('fat_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            total_carbohydrates=ExpressionWrapper(F('carbohydrates_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
+            display_salt=Case(
+                When(label_type='US', then=ExpressionWrapper(
+                    (F('salt_1g') / 2.5) * 1000 * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)
+                )),
+                default=ExpressionWrapper(F('salt_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            )
+        )
 
 
 class Allergen(models.Model):
@@ -130,8 +150,16 @@ class MealCategory(models.Model):
         ordering = ['order']
 
 
+class FullMeal(models.Model):
+    meal_category = models.ForeignKey(MealCategory, on_delete=models.CASCADE, related_name='fullmeal')
+    name = models.CharField(max_length=255)
+    portion= models.FloatField()
+
+
+
 class MealItem(models.Model):
     meal_category = models.ForeignKey(MealCategory, on_delete=models.CASCADE, related_name='items')
+    full_meal = models.ForeignKey(FullMeal, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     
     name = models.CharField(max_length=255)
     amount_g = models.FloatField(help_text="Waga w gramach lub mililitrach")
@@ -147,3 +175,5 @@ class MealItem(models.Model):
 
     original_product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
     original_recipe = models.ForeignKey('Dish', on_delete=models.SET_NULL, null=True, blank=True)
+
+    objects = MealItemQuerySet.as_manager()

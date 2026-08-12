@@ -1,5 +1,9 @@
 from decimal import Decimal, ROUND_HALF_UP
-from .models import Product
+from .models import Product, MealItem, DailyMealCalendar, MealCategory, FullMeal
+
+from django.db.models import Prefetch, Sum, ExpressionWrapper, F, DecimalField, Value
+from django.db.models.functions import Coalesce
+
 
 class ProductService:
     @staticmethod
@@ -64,3 +68,40 @@ class ProductService:
             instance.allergens.set(allergens)
 
         return instance
+
+
+def get_daily_meal_plan(user, target_date):
+    annotated_items = MealItem.objects.with_neutriens()
+
+    calendar_day = DailyMealCalendar.objects.filter(
+        user=user,
+        date=target_date
+    ).prefetch_related(
+        Prefetch(
+            'meal',
+            MealCategory.objects.prefetch_related(
+                Prefetch(('items', annotated_items)),
+                Prefetch('fullmeal', FullMeal.objects.prefetch_related(
+                    Prefetch('products', annotated_items)
+                ))
+            )
+        )
+    ).first()
+
+    if not calendar_day:
+        return None
+
+    day_totals = MealItem.objects.filter(
+        meal_category__calendar=calendar_day
+    ).aggregate(
+        total_kcal=Coalesce(Sum(ExpressionWrapper(F('kcal_1g') * F('amount_g'), output_field=DecimalField())), Value(0.0)),
+        total_protein=Coalesce(Sum(ExpressionWrapper(F('protein_1g') * F('amount_g'), output_field=DecimalField())), Value(0.0)),
+        total_fat=Coalesce(Sum(ExpressionWrapper(F('fat_1g') * F('amount_g'), output_field=DecimalField())), Value(0.0)),
+        total_carbohydrates=Coalesce(Sum(ExpressionWrapper(F('carbohydrates_1g') * F('amount_g'), output_field=DecimalField())), Value(0.0)),
+        total_salt=Coalesce(Sum(ExpressionWrapper(F('salt_1g') * F('amount_g'), output_field=DecimalField())), Value(0.0))
+    )
+
+    return {
+        "calendar": calendar_day,
+        "totals": day_totals
+    }

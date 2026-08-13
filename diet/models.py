@@ -74,30 +74,55 @@ class Allergen(models.Model):
     name = models.CharField(max_length=255, db_index=True)
 
 
+
 class Product(models.Model):
-    LABEL_CHOICES = [('EU', 'Europe'), ('US', 'USA')]
-    label_type = models.CharField(max_length=2, choices=LABEL_CHOICES)
-    user = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
     title = models.CharField(max_length=255, db_index=True)
-    category = models.ForeignKey(ProductCategory, on_delete=models.CASCADE, related_name='products')
-    allergens = models.ManyToManyField(Allergen, related_name='products')
+    category = models.ForeignKey('ProductCategory', on_delete=models.CASCADE, related_name='products')
+    
+    # Makro na 1g
+    kcal_1g = models.DecimalField(max_digits=10, decimal_places=5)
+    protein_1g = models.DecimalField(max_digits=10, decimal_places=5)
+    fat_1g = models.DecimalField(max_digits=10, decimal_places=5)
+    carbohydrates_1g = models.DecimalField(max_digits=10, decimal_places=5)
+    salt_1g = models.DecimalField(max_digits=10, decimal_places=5, default=0)
 
-    # In USA we put kcal per serving in EU per 100g then endpoint/service make logic 
-    kcal_1g = models.DecimalField(max_digits=12, decimal_places=5)
-    protein_1g = models.DecimalField(max_digits=12, decimal_places=5)
-    fat_1g = models.DecimalField(max_digits=12, decimal_places=5)
-    carbohydrates_1g = models.DecimalField(max_digits=12, decimal_places=5)
-    salt_1g = models.DecimalField(max_digits=12, decimal_places=5, default=0)
+    barcode = models.CharField(max_length=255, db_index=True, blank=True, null=True)
+    user = models.ForeignKey('CentralUser', on_delete=models.CASCADE, null=True, blank=True)
 
-    packaging_type = models.ForeignKey(Packaging, on_delete=models.CASCADE) #US/EU
-    packaging_size = models.DecimalField(max_digits=8, decimal_places=2, default=100.00) #US -> required EU -> Not requred
-    packaging_metric = models.CharField(max_length=10) #US/EU # 'g', 'ml', 'oz'
+    # Informacje o głównym opakowaniu
+    package_whole_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Waga całego opakowania w gramach/ml")
+    package_name = models.CharField(max_length=100, null=True, blank=True, help_text="np. Puszka, Kubek, Paczka, Butelka")
 
-    barcode = models.CharField(max_length=255, db_index=True)
-    image = models.ImageField(upload_to='products_images/', blank=True, null=True)
-    countries = models.ManyToManyField(ProductCountry, related_name='products')
 
-    objects = ProductQuerySet.as_manager()
+class ProductServingUnit(models.Model):
+    UNIT_CHOICES = [
+        ('g', 'Gram'),
+        ('ml', 'Mililitr'),
+        ('piece', 'Sztuka'),
+        ('slice', 'Plaster'),
+        ('cup', 'Szklanka / Kubek'),
+        ('tbsp', 'Łyżka'),
+        ('tsp', 'Łyżeczka'),
+        ('can', 'Puszka'),
+        ('pack', 'Opakowanie / Paczka'),
+        ('handful', 'Garść'),
+        ('serving', 'Porcja producenta'),
+        ('custom', 'Własna miara'),
+    ]
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='serving_units')
+    unit_name = models.CharField(max_length=20, choices=UNIT_CHOICES)
+    custom_label = models.CharField(max_length=100, blank=True, null=True, help_text="np. Duża łyżka, Szklanka 250ml")
+    
+    gram_weight = models.DecimalField(max_digits=8, decimal_places=2)
+
+    # DODATKOWE POLA DLA DANYCH OD UŻYTKOWNIKA / AI
+    created_by = models.ForeignKey('CentralUser', on_delete=models.SET_NULL, null=True, blank=True)
+    is_global = models.BooleanField(default=True, help_text="True jeśli miara wygenerowana przez AI/System, False jeśli stworzona przez konkretnego usera")
+
+    def __str__(self):
+        label = self.custom_label or self.get_unit_name_display()
+        return f"{self.product.title} - {label} ({self.gram_weight}g)"
 
 
 class Dish(models.Model):
@@ -159,20 +184,23 @@ class FullMeal(models.Model):
 
 class MealItem(models.Model):
     meal_category = models.ForeignKey(MealCategory, on_delete=models.CASCADE, related_name='items')
-    full_meal = models.ForeignKey(FullMeal, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
+    full_meal = models.ForeignKey('FullMeal', on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     
     name = models.CharField(max_length=255)
-    amount_g = models.FloatField(help_text="Waga w gramach lub mililitrach")
     
+    # Snapshot makro na 1g (zdenormalizowane)
     kcal_1g = models.DecimalField(max_digits=12, decimal_places=5)
     protein_1g = models.DecimalField(max_digits=12, decimal_places=5)
     fat_1g = models.DecimalField(max_digits=12, decimal_places=5)
     carbohydrates_1g = models.DecimalField(max_digits=12, decimal_places=5)
     salt_1g = models.DecimalField(max_digits=12, decimal_places=5, default=0)
 
-    packaging_type = models.ForeignKey(Packaging, on_delete=models.CASCADE)
-    packaging_size = models.DecimalField(max_digits=8, decimal_places=2, default=100.00)
+    # Wybrana miara i ilość
+    product_serving_unit = models.ForeignKey('ProductServingUnit', on_delete=models.SET_NULL, null=True, blank=True)
+    amount = models.DecimalField(max_digits=8, decimal_places=2, default=1.0, help_text="Ilość porcji, np. 2 dla 2 plastrów lub 150 dla 150g")
+    calculated_gram_weight = models.DecimalField(max_digits=8, decimal_places=2, help_text="Wyliczona końcowa waga w gramach")
 
+    # Referencja historyczna (opcjonalna)
     original_product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
     original_recipe = models.ForeignKey('Dish', on_delete=models.SET_NULL, null=True, blank=True)
 

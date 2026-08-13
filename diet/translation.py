@@ -1,19 +1,8 @@
-from modeltranslation.translator import register, TranslationOptions
-from .models import Packaging, ProductCategory, DishCategory, DietType
+from modeltranslation.translator import TranslationOptions, register
+from .models import Product, ProductServingUnit
 
-@register(Packaging)
-class PackagingTranslationOptions(TranslationOptions):
-    fields = ('name',)
 
-@register(ProductCategory)
-class ProductCategoryTranslationOptions(TranslationOptions):
-    fields = ('name',)
-
-@register(DishCategory)
-class DishCategoryTranslationOptions(TranslationOptions):
-    fields = ('name',)
-
-@register(DietType)
-class DietTypeTranslationOptions(TranslationOptions):
-    fields = ('name',)
+@register(Product)
+class ProductTranslationOptions(TranslationOptions):
+    fields = ('package_name',)
 

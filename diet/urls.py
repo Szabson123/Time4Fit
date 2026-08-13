@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (CreateProductView, ListMyProductView, CategoryHelper, AllergensHelper,
-                    ProductDetailView, MyDishesListView, CreateMyDish, ListGlobalProducts, DestroyMyDish, UpdateMyDish)
+                    ProductDetailView, MyDishesListView, CreateMyDish, ListGlobalProducts, DestroyMyDish, UpdateMyDish, DailyMealCalendarDetailView)
 
 
 urlpatterns = [
@@ -21,4 +21,5 @@ urlpatterns = [
     path('update-dish/<int:pk>/', UpdateMyDish.as_view(), name='update-product'),
     path('delete-dish/<int:pk>/', DestroyMyDish.as_view(), name='delete-product'),
 
+    path('daily-meals/', DailyMealCalendarDetailView.as_view(), name='daily-meals')
 ]

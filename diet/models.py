@@ -70,15 +70,17 @@ class MealItemQuerySet(models.QuerySet):
         )
 
 
-class Allergen(models.Model):
-    name = models.CharField(max_length=255, db_index=True)
-
-
-
 class Product(models.Model):
     title = models.CharField(max_length=255, db_index=True)
-    category = models.ForeignKey('ProductCategory', on_delete=models.CASCADE, related_name='products')
+    brand = models.CharField(max_length=150,blank=True,null=True,db_index=True,help_text="np. Piątnica, Bovetti")
+    barcode = models.CharField(max_length=64, db_index=True, blank=True, null=True, help_text="EAN-13, EAN-8, UPC")
+    quantity_display = models.CharField(max_length=100, blank=True, null=True, help_text="Oryginalny tekst z etykiety np. '350 g', '4 x 125g'",)
+
+    image_url = models.URLField(max_length=500, blank=True, null=True, help_text="Link do miniatury z CDN",)
     
+    category = models.ForeignKey('ProductCategory', related_name='products', on_delete=models.SET_NULL, null=True, blank=True)
+    user = models.ForeignKey('user.CentralUser', on_delete=models.CASCADE, null=True, blank=True)
+
     # Makro na 1g
     kcal_1g = models.DecimalField(max_digits=10, decimal_places=5)
     protein_1g = models.DecimalField(max_digits=10, decimal_places=5)
@@ -86,12 +88,43 @@ class Product(models.Model):
     carbohydrates_1g = models.DecimalField(max_digits=10, decimal_places=5)
     salt_1g = models.DecimalField(max_digits=10, decimal_places=5, default=0)
 
-    barcode = models.CharField(max_length=255, db_index=True, blank=True, null=True)
-    user = models.ForeignKey('CentralUser', on_delete=models.CASCADE, null=True, blank=True)
+    sugars_1g = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+    saturated_fat_1g = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+    fiber_1g = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True)
+
+    nutriscore = models.CharField(max_length=1, choices=[("A", "A"),("B", "B"),("C", "C"),("D", "D"),("E", "E")], null=True, blank=True, db_index=True)
+    nova_group = models.PositiveSmallIntegerField(choices=[(1, "1"), (2, "2"), (3, "3"), (4, "4")], null=True, blank=True, db_index=True)
+    
+    allergens = models.JSONField(default=list, blank=True, help_text="np. ['milk', 'nuts']")
+    countries = models.JSONField(default=list, blank=True, help_text="Kraje dystrybucji: ['poland', 'germany']",)
 
     # Informacje o głównym opakowaniu
     package_whole_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Waga całego opakowania w gramach/ml")
     package_name = models.CharField(max_length=100, null=True, blank=True, help_text="np. Puszka, Kubek, Paczka, Butelka")
+
+    objects = MealItemQuerySet.as_manager()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["barcode"]),
+            models.Index(fields=["title", "brand"]),
+        ]
+
+    def __str__(self):
+        brand_prefix = f"[{self.brand}] " if self.brand else ""
+        return f"{brand_prefix}{self.title}"
+
+
+class ProductAdditionalInfo(models.Model):
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="additional_info", primary_key=True)
+    is_vegan = models.BooleanField(null=True, blank=True, db_index=True)
+    is_vegetarian = models.BooleanField(null=True, blank=True, db_index=True)
+    is_palm_oil_free = models.BooleanField(null=True, blank=True)
+    is_complete_profile = models.BooleanField(default=True, help_text="True jeśli produkt ma kompletne dane o cukrach i tłuszczach nasyconych",)
+    ingredients_text = models.TextField(blank=True, null=True)
+    traces = models.JSONField(default=list, blank=True, help_text="Śladowe ilości: ['soybeans', 'gluten']",)
+    labels = models.JSONField(default=list, blank=True, help_text="Certyfikaty: ['bio', 'no-gluten', 'organic']",)
+    additives_tags = models.JSONField(default=list, blank=True, help_text="Lista dodatków E: ['e322', 'e330']")
 
 
 class ProductServingUnit(models.Model):
@@ -117,7 +150,7 @@ class ProductServingUnit(models.Model):
     gram_weight = models.DecimalField(max_digits=8, decimal_places=2)
 
     # DODATKOWE POLA DLA DANYCH OD UŻYTKOWNIKA / AI
-    created_by = models.ForeignKey('CentralUser', on_delete=models.SET_NULL, null=True, blank=True)
+    created_by = models.ForeignKey('user.CentralUser', on_delete=models.SET_NULL, null=True, blank=True)
     is_global = models.BooleanField(default=True, help_text="True jeśli miara wygenerowana przez AI/System, False jeśli stworzona przez konkretnego usera")
 
     def __str__(self):
@@ -126,7 +159,7 @@ class ProductServingUnit(models.Model):
 
 
 class Dish(models.Model):
-    user = models.ForeignKey(CentralUser, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.ForeignKey('user.CentralUser', on_delete=models.CASCADE, null=True, blank=True)
     name = models.CharField(max_length=255)
 
     product = models.ManyToManyField(Product, related_name='dishes', through='DishIngredient')
@@ -134,7 +167,6 @@ class Dish(models.Model):
     diet_type = models.ForeignKey(DietType, on_delete=models.SET_NULL, null=True, blank=True)
 
     recipe = models.JSONField(default=dict, null=True, blank=True)
-    additional_allergens = models.ManyToManyField(Allergen, related_name='dishes')
     img = models.ImageField(upload_to='dishes_images/', blank=True, null=True)
 
 
@@ -188,19 +220,16 @@ class MealItem(models.Model):
     
     name = models.CharField(max_length=255)
     
-    # Snapshot makro na 1g (zdenormalizowane)
     kcal_1g = models.DecimalField(max_digits=12, decimal_places=5)
     protein_1g = models.DecimalField(max_digits=12, decimal_places=5)
     fat_1g = models.DecimalField(max_digits=12, decimal_places=5)
     carbohydrates_1g = models.DecimalField(max_digits=12, decimal_places=5)
     salt_1g = models.DecimalField(max_digits=12, decimal_places=5, default=0)
 
-    # Wybrana miara i ilość
     product_serving_unit = models.ForeignKey('ProductServingUnit', on_delete=models.SET_NULL, null=True, blank=True)
     amount = models.DecimalField(max_digits=8, decimal_places=2, default=1.0, help_text="Ilość porcji, np. 2 dla 2 plastrów lub 150 dla 150g")
-    calculated_gram_weight = models.DecimalField(max_digits=8, decimal_places=2, help_text="Wyliczona końcowa waga w gramach")
+    calculated_gram_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Wyliczona końcowa waga w gramach")
 
-    # Referencja historyczna (opcjonalna)
     original_product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
     original_recipe = models.ForeignKey('Dish', on_delete=models.SET_NULL, null=True, blank=True)
 

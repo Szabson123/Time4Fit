@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
 
     'user',
     'user_profile',
@@ -141,10 +142,15 @@ SIMPLE_JWT = {
 
 
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'Your Project API',
-    'DESCRIPTION': 'Your project description',
+    'TITLE': 'Twoje API',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    'SCHEMA_PATH_PREFIX': r'/api/v1',
+    
+    'SWAGGER_UI_SETTINGS': {
+        'tagsSorter': 'alpha',
+        'operationsSorter': 'alpha',
+    },
 }
 
 AUTH_USER_MODEL = "user.CentralUser"

@@ -9,7 +9,9 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination, CursorPagination
+from rest_framework.filters import SearchFilter
 from rest_framework import status
+
 
 from django.db import transaction
 from .serializers import (
@@ -211,21 +213,20 @@ class CreateCustomMealView(GenericAPIView):
 
 class ProductCursorPagination(CursorPagination):
     page_size = 20
-    ordering = ('title', 'id')
+    ordering = ('-popularity', '-id')
 
 class ProductListView(ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [AllowAny]
     pagination_class = ProductCursorPagination
 
-    def get_queryset(self):
+    def get_annotated_queryset(self, base_qs):
         first_serving = ProductServingUnit.objects.filter(
             product=OuterRef('pk')
         ).order_by('id')
 
         return (
-            Product.objects
-            .filter(user__isnull=True)
+            base_qs
             .annotate(
                 first_unit_id=Subquery(first_serving.values('id')[:1]),
                 first_unit_label=Subquery(first_serving.values('custom_label')[:1]),
@@ -238,18 +239,47 @@ class ProductListView(ListAPIView):
                     F('package_whole_g'),
                     Value(100.0),
                     output_field=DecimalField()
-                )
-            )
-            .annotate(
+                ),
                 calc_kcal=ExpressionWrapper(
                     F('calc_weight') * F('kcal_1g'),
                     output_field=DecimalField(max_digits=10, decimal_places=2)
                 )
             )
-            .only('id', 'title', 'brand', 'image_url', 'kcal_1g', 'package_name', 'package_whole_g')
-            .order_by('title', 'id')
+            .only('id', 'title', 'brand', 'image_url', 'kcal_1g', 'package_name', 'package_whole_g', 'popularity')
         )
 
+    def list(self, request, *args, **kwargs):
+        query = request.query_params.get('search', '').strip()
+        
+        if query:
+            matching_ids = list(
+                Product.objects
+                .filter(user__isnull=True, title__icontains=query)
+                .order_by('-popularity', '-id')
+                .values_list('id', flat=True)[:50]
+            )
+
+            if not matching_ids:
+                return Response([])
+
+            qs = self.get_annotated_queryset(
+                Product.objects.filter(id__in=matching_ids)
+            ).order_by('-popularity', '-id')
+
+            serializer = self.get_serializer(qs, many=True)
+            return Response(serializer.data)
+
+        base_qs = Product.objects.filter(user__isnull=True).order_by('-popularity', '-id')
+        queryset = self.get_annotated_queryset(base_qs)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
 
 class ProductDetailByBarcodeView(RetrieveAPIView):
     serializer_class = ProductDetailSerializer

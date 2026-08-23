@@ -35,7 +35,7 @@ def test_product_list_returns_only_global_products(auth_api_client):
         user=user,
     )
 
-    url = "/diet/products/"
+    url = "/api/v1/diet/products/"
     response = client.get(url)
     assert response.status_code == 200
 
@@ -68,7 +68,7 @@ def test_product_with_serving_unit_calculates_correct_values(auth_api_client):
         gram_weight=Decimal("10.00"),
     )
 
-    url = "/diet/products/"
+    url = "/api/v1/diet/products/"
     response = client.get(url)
     assert response.status_code == 200
 
@@ -98,7 +98,7 @@ def test_product_with_package_whole_g_fallback(auth_api_client):
         package_name="Puszka",
     )
 
-    url = "/diet/products/"
+    url = "/api/v1/diet/products/"
     response = client.get(url)
     assert response.status_code == 200
 
@@ -127,7 +127,7 @@ def test_product_default_100g_fallback(auth_api_client):
         package_name=None,
     )
 
-    url = "/diet/products/"
+    url = "/api/v1/diet/products/"
     response = client.get(url)
     assert response.status_code == 200
 
@@ -158,17 +158,17 @@ def test_product_list_pagination(auth_api_client):
     ]
     Product.objects.bulk_create(products)
 
-    url = "/diet/products/"
+    url = "/api/v1/diet/products/"
     response = client.get(url)
     assert response.status_code == 200
 
-    assert response.data["count"] == 25
     assert len(response.data["results"]) == 20
     assert response.data["next"] is not None
     assert response.data["previous"] is None
 
-    # Pobieramy stronę 2
-    page2_response = client.get("/diet/products/?page=2")
+    # Pobieramy stronę 2 za pomocą linku next z CursorPagination
+    next_url = response.data["next"]
+    page2_response = client.get(next_url)
     assert page2_response.status_code == 200
     assert len(page2_response.data["results"]) == 5
     assert page2_response.data["next"] is None
@@ -206,7 +206,7 @@ def test_get_product_by_barcode_happy_path(auth_api_client):
         ingredients_text="Białko sojowe, czekolada",
     )
 
-    url = f"/diet/products/barcode/{product.barcode}/"
+    url = f"/api/v1/diet/products/barcode/{product.barcode}/"
     response = client.get(url)
     assert response.status_code == 200
 
@@ -227,7 +227,7 @@ def test_get_product_by_barcode_happy_path(auth_api_client):
 def test_get_product_by_barcode_not_found(auth_api_client):
     client, _ = auth_api_client
 
-    url = "/diet/products/barcode/9999999999999/"
+    url = "/api/v1/diet/products/barcode/9999999999999/"
     response = client.get(url)
     assert response.status_code == 404
 
@@ -247,9 +247,67 @@ def test_get_product_by_barcode_user_owned_product(auth_api_client):
         user=user,
     )
 
-    url = f"/diet/products/barcode/{product.barcode}/"
+    url = f"/api/v1/diet/products/barcode/{product.barcode}/"
     response = client.get(url)
     assert response.status_code == 200
     assert response.data["id"] == product.id
     assert response.data["title"] == "Własny chleb orkiszowy"
+
+
+@pytest.mark.django_db
+def test_product_list_search(auth_api_client):
+    client, _ = auth_api_client
+    from diet.models import ProductCategory
+
+    cat_fruits = ProductCategory.objects.create(name="Owoce")
+    cat_dairy = ProductCategory.objects.create(name="Nabiał")
+
+    Product.objects.create(
+        title="Banan Bio",
+        brand="Chiquita",
+        barcode="111111",
+        category=cat_fruits,
+        kcal_1g=Decimal("0.89000"),
+        protein_1g=Decimal("0.01100"),
+        fat_1g=Decimal("0.00300"),
+        carbohydrates_1g=Decimal("0.23000"),
+        user=None,
+    )
+    Product.objects.create(
+        title="Twaróg Półtłusty",
+        brand="Piątnica",
+        barcode="222222",
+        category=cat_dairy,
+        kcal_1g=Decimal("1.10000"),
+        protein_1g=Decimal("0.16000"),
+        fat_1g=Decimal("0.04000"),
+        carbohydrates_1g=Decimal("0.03500"),
+        user=None,
+    )
+
+    # 1. Wyszukiwanie po tytule
+    res1 = client.get("/api/v1/diet/products/?search=Banan")
+    assert res1.status_code == 200
+    assert len(res1.data["results"]) == 1
+    assert res1.data["results"][0]["title"] == "Banan Bio"
+
+    # 2. Wyszukiwanie po marce
+    res2 = client.get("/api/v1/diet/products/?search=Piątnica")
+    assert res2.status_code == 200
+    assert len(res2.data["results"]) == 1
+    assert res2.data["results"][0]["title"] == "Twaróg Półtłusty"
+
+    # 3. Wyszukiwanie po kodzie kreskowym
+    res3 = client.get("/api/v1/diet/products/?search=111111")
+    assert res3.status_code == 200
+    assert len(res3.data["results"]) == 1
+    assert res3.data["results"][0]["title"] == "Banan Bio"
+
+    # 4. Wyszukiwanie po nazwie kategorii
+    res4 = client.get("/api/v1/diet/products/?search=Nabiał")
+    assert res4.status_code == 200
+    assert len(res4.data["results"]) == 1
+    assert res4.data["results"][0]["title"] == "Twaróg Półtłusty"
+
+
 

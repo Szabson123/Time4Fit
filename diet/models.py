@@ -5,7 +5,7 @@ from user.models import CentralUser
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import ValidationError
 from typing import List
-
+from django.contrib.postgres.indexes import GinIndex
 
 class ProductCountry(models.Model):
     name = models.CharField(max_length=255)
@@ -96,13 +96,19 @@ class Product(models.Model):
     package_whole_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Waga całego opakowania w gramach/ml")
     package_name = models.CharField(max_length=100, null=True, blank=True, help_text="np. Puszka, Kubek, Paczka, Butelka")
 
+    popularity = models.IntegerField(null=True, blank=True)
+
     objects = ProductQuerySet.as_manager()
 
-    indexes = [
-        models.Index(fields=["barcode"]),
-        models.Index(fields=["title", "brand"]),
-        models.Index(fields=["user", "title", "id"], name="product_user_title_id_idx"),
-    ]
+    class Meta:
+        indexes = [
+            models.Index(fields=["barcode"]),
+            models.Index(fields=["title", "brand"]),
+            models.Index(fields=["user", "title", "id"], name="product_user_title_id_idx"),
+            GinIndex(fields=['title'], opclasses=['gin_trgm_ops'], name='prod_title_trgm_idx'),
+            GinIndex(fields=['brand'], opclasses=['gin_trgm_ops'], name='prod_brand_trgm_idx'),
+            models.Index(fields=["-popularity", "-id"], name="product_pop_id_idx"),
+        ]
 
     def __str__(self):
         brand_prefix = f"[{self.brand}] " if self.brand else ""
@@ -146,6 +152,11 @@ class ProductServingUnit(models.Model):
     # DODATKOWE POLA DLA DANYCH OD UŻYTKOWNIKA / AI
     created_by = models.ForeignKey('user.CentralUser', on_delete=models.SET_NULL, null=True, blank=True)
     is_global = models.BooleanField(default=True, help_text="True jeśli miara wygenerowana przez AI/System, False jeśli stworzona przez konkretnego usera")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['product', 'id']),
+        ]
 
     def __str__(self):
         label = self.custom_label or self.get_unit_name_display()

@@ -73,8 +73,9 @@ def test_reset_password_view_sends_email(client):
     user.save()
 
     # Call reset password API (with lowercase email test)
-    response = client.post("/user/reset_password/", {"email": "userreset@example.com"}, format="json")
+    response = client.post("/api/v1/user/reset_password/", {"email": "userreset@example.com"}, format="json")
     assert response.status_code == 200
+
 
     assert len(mail.outbox) == 1
     sent_email = mail.outbox[0]

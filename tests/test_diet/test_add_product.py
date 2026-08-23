@@ -19,7 +19,7 @@ def sample_product():
 def test_add_product_creates_day_and_meal_standard(auth_api_client, sample_product):
     client, user = auth_api_client
 
-    url = "/diet/add-product/"
+    url = "/api/v1/diet/add-product/"
     payload = {
         "product_id": sample_product.id,
         "date": "2026-08-20",
@@ -46,7 +46,7 @@ def test_add_product_creates_day_and_meal_standard(auth_api_client, sample_produ
 def test_create_custom_meal_assigns_correct_meal_type(auth_api_client):
     client, user = auth_api_client
 
-    url = "/diet/add-meal/"
+    url = "/api/v1/diet/add-meal/"
     payload1 = {
         "date": "2026-08-20",
         "custom_name": "Podwieczorek 2",
@@ -71,13 +71,14 @@ def test_add_product_to_custom_meal(auth_api_client, sample_product):
     client, user = auth_api_client
 
     # Najpierw tworzymy posiłek custom
-    create_meal_url = "/diet/add-meal/"
+    create_meal_url = "/api/v1/diet/add-meal/"
     create_res = client.post(create_meal_url, {"date": "2026-08-20", "custom_name": "Drugie śniadanie extra"}, format="json")
     assert create_res.status_code == 201
     custom_meal_type = create_res.data["meal_type"]
 
     # Następnie dodajemy produkt do tego posiłku custom (meal_type=6)
-    add_product_url = "/diet/add-product/"
+    add_product_url = "/api/v1/diet/add-product/"
+
     payload = {
         "product_id": sample_product.id,
         "date": "2026-08-20",
@@ -98,11 +99,11 @@ def test_add_product_to_custom_meal(auth_api_client, sample_product):
 def test_add_product_to_nonexistent_custom_meal_fails(auth_api_client, sample_product):
     client, user = auth_api_client
 
-    url = "/diet/add-product/"
+    url = "/api/v1/diet/add-product/"
     payload = {
         "product_id": sample_product.id,
         "date": "2026-08-20",
-        "meal_type": 6,  # Posiłek custom jeszcze nie istnieje!
+        "meal_type": 6,
         "amount": 100.0,
     }
 
@@ -118,7 +119,7 @@ def test_add_product_to_existing_meal(auth_api_client, sample_product):
     calendar = DailyMealCalendar.objects.create(user=user, date="2026-08-20")
     meal = MealCategory.objects.create(calendar=calendar, meal_type=3, name="Obiad", order=3)
 
-    url = "/diet/add-product/"
+    url = "/api/v1/diet/add-product/"
     payload = {
         "product_id": sample_product.id,
         "date": "2026-08-20",

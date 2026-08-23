@@ -60,3 +60,28 @@ def test_send_welcome_email_reset_password_purpose():
     html_alternatives = [content for content, mimetype in sent_email.alternatives if mimetype == "text/html"]
     assert "999888" in html_alternatives[0]
     assert "Prośba o zmianę hasła" in html_alternatives[0]
+
+
+@pytest.mark.django_db
+def test_reset_password_view_sends_email(client):
+    from user.models import CentralUser
+    mail.outbox.clear()
+
+    # Create user
+    user = CentralUser.objects.create_user(email="UserReset@example.com", password="password123")
+    user.is_user_activated = True
+    user.save()
+
+    # Call reset password API (with lowercase email test)
+    response = client.post("/user/reset_password/", {"email": "userreset@example.com"}, format="json")
+    assert response.status_code == 200
+
+    assert len(mail.outbox) == 1
+    sent_email = mail.outbox[0]
+    assert sent_email.to == ["UserReset@example.com"]
+    assert "Resetowanie hasła" in sent_email.subject
+    
+    html_alternatives = [content for content, mimetype in sent_email.alternatives if mimetype == "text/html"]
+    assert len(html_alternatives) == 1
+    assert "Prośba o zmianę hasła" in html_alternatives[0]
+

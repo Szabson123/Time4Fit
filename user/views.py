@@ -50,7 +50,10 @@ class UserRegisterView(GenericAPIView):
                 expires_at = default_expires(ttl_sec)
             )
 
-            send_welcome_email.delay(email, code_plain, purpose="register")
+            try:
+                send_welcome_email.delay(email, code_plain, "register")
+            except Exception:
+                send_welcome_email(email, code_plain, "register")
 
         return Response({
             "challenge_id": str(challenge.id),
@@ -82,7 +85,10 @@ class UserLoginView(GenericAPIView):
                 expires_at=default_expires(sec_ttl)
             )
             
-        send_welcome_email.delay(user.email, code_plain, purpose="login")
+        try:
+            send_welcome_email.delay(user.email, code_plain, "login")
+        except Exception:
+            send_welcome_email(user.email, code_plain, "login")
 
         return Response({
             "challenge_id": str(challenge.id),
@@ -101,15 +107,14 @@ class ResetPasswordView(GenericAPIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         data = serializer.validated_data
 
-        email = data["email"]
+        email = data["email"].strip()
         
         code_plain = gen_code(6)
 
         sec_ttl = 300
 
-        try:
-            user = CentralUser.objects.get(email=email)
-        except CentralUser.DoesNotExist:
+        user = CentralUser.objects.filter(email__iexact=email).first()
+        if not user:
             return Response({
                 "detail": "Jeśli ten e-mail istnieje, wyślemy kod.",
                 "challenge_id": str(uuid.uuid4()),
@@ -123,7 +128,10 @@ class ResetPasswordView(GenericAPIView):
             expires_at=default_expires(sec_ttl)
         )
 
-        send_welcome_email.delay(email, code_plain, purpose="reset_password")
+        try:
+            send_welcome_email.delay(user.email, code_plain, "reset_password")
+        except Exception:
+            send_welcome_email(user.email, code_plain, "reset_password")
 
         return Response({
             "detail": "Jeśli ten e-mail istnieje, wyślemy kod.",

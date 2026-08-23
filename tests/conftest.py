@@ -2,6 +2,12 @@ import pytest
 from rest_framework.test import APIClient
 
 
+from pytest_factoryboy import register
+from tests.test_event.factories import UserFactory
+
+register(UserFactory)
+
+
 @pytest.fixture
 def api_client():
     return APIClient()

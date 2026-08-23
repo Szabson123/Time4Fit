@@ -60,15 +60,31 @@ class MealCategorySerializer(serializers.ModelSerializer):
     category_fat = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     category_carbohydrates = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     category_salt = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
 
     class Meta:
         model = MealCategory
         fields = [
-            'id', 'name', 'order', 
+            'id', 'meal_type', 'meal_type_display', 'name', 'order', 
             'category_kcal', 'category_protein', 'category_fat', 
             'category_carbohydrates', 'category_salt', 
             'full_meals', 'direct_items'
         ]
+
+
+class AddProductToMealSerializer(serializers.Serializer):
+    product_id = serializers.IntegerField(required=True)
+    date = serializers.DateField(required=True)
+    meal_type = serializers.IntegerField(min_value=1, required=True)
+
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=1.0)
+    serving_unit_id = serializers.IntegerField(required=False, allow_null=True)
+    calculated_gram_weight = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+
+
+class CreateCustomMealSerializer(serializers.Serializer):
+    date = serializers.DateField(required=True)
+    custom_name = serializers.CharField(max_length=100, required=True)
 
 
 class DailyMealCalendarSerializer(serializers.ModelSerializer):

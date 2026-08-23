@@ -53,20 +53,14 @@ class ProductQuerySet(models.QuerySet):
 
 class MealItemQuerySet(models.QuerySet):
     def with_nutrients(self):
-        multiplier = Coalesce(F('amount_g'), Value(0.0), output_field=DecimalField())
+        multiplier = Coalesce(F('calculated_gram_weight'), Value(0.0), output_field=DecimalField())
 
         return self.annotate(
             total_kcal=ExpressionWrapper(F('kcal_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
             total_protein=ExpressionWrapper(F('protein_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
             total_fat=ExpressionWrapper(F('fat_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
             total_carbohydrates=ExpressionWrapper(F('carbohydrates_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
-            display_salt=Case(
-                When(label_type='US', then=ExpressionWrapper(
-                    (F('salt_1g') / 2.5) * 1000 * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)
-                )),
-                default=ExpressionWrapper(F('salt_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
-                output_field=DecimalField(max_digits=12, decimal_places=2)
-            )
+            display_salt=ExpressionWrapper(F('salt_1g') * multiplier, output_field=DecimalField(max_digits=12, decimal_places=2)),
         )
 
 
@@ -102,7 +96,7 @@ class Product(models.Model):
     package_whole_g = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text="Waga całego opakowania w gramach/ml")
     package_name = models.CharField(max_length=100, null=True, blank=True, help_text="np. Puszka, Kubek, Paczka, Butelka")
 
-    objects = MealItemQuerySet.as_manager()
+    objects = ProductQuerySet.as_manager()
 
     class Meta:
         indexes = [
@@ -199,19 +193,37 @@ class DailyMealCalendar(models.Model):
 
 
 class MealCategory(models.Model):
+    MEAL_TYPE_CHOICES = [
+        (1, 'Śniadanie'),
+        (2, 'Drugie śniadanie'),
+        (3, 'Obiad'),
+        (4, 'Podwieczorek'),
+        (5, 'Kolacja'),
+        (6, 'Custom'),
+    ]
+
     calendar = models.ForeignKey(DailyMealCalendar, on_delete=models.CASCADE, related_name='meals')
-    name = models.CharField(max_length=100) # np. "Śniadanie", "Przekąska po treningu"
+    meal_type = models.PositiveSmallIntegerField(choices=MEAL_TYPE_CHOICES, default=1)
+    name = models.CharField(max_length=100, blank=True, null=True) # np. "Śniadanie", "Przekąska po treningu"
     order = models.PositiveIntegerField(default=1)
 
     class Meta:
         ordering = ['order']
+
+    def save(self, *args, **kwargs):
+        if not self.name and self.meal_type:
+            dict_choices = dict(self.MEAL_TYPE_CHOICES)
+            if self.meal_type in dict_choices:
+                self.name = dict_choices[self.meal_type]
+            else:
+                self.name = f"Posiłek {self.meal_type}"
+        super().save(*args, **kwargs)
 
 
 class FullMeal(models.Model):
     meal_category = models.ForeignKey(MealCategory, on_delete=models.CASCADE, related_name='fullmeal')
     name = models.CharField(max_length=255)
     portion= models.FloatField()
-
 
 
 class MealItem(models.Model):

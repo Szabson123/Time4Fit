@@ -7,14 +7,28 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 
 from django.db import transaction
-from .serializers import DailyMealCalendarSerializer, AddProductToMealSerializer, MealItemSerializer, CreateCustomMealSerializer, MealCategorySerializer
+from .serializers import (
+    DailyMealCalendarSerializer,
+    AddProductToMealSerializer,
+    MealItemSerializer,
+    CreateCustomMealSerializer,
+    MealCategorySerializer,
+    ProductListSerializer,
+)
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
 
 from datetime import datetime
+
+
+class CustomPagination(PageNumberPagination):
+    page_size = 20
+    max_page_size = 60
+
 
 class DailyMealCalendarDetailView(GenericAPIView):
     permission_classes = [IsAuthenticated]
@@ -197,3 +211,17 @@ class CreateCustomMealView(GenericAPIView):
 
         out_serializer = MealCategorySerializer(categories_qs)
         return Response(out_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ProductListView(ListAPIView):
+    serializer_class = ProductListSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = CustomPagination
+
+    def get_queryset(self):
+        return (
+            Product.objects
+            .filter(user__isnull=True)
+            .prefetch_related('serving_units')
+            .order_by('title', 'id')
+        )

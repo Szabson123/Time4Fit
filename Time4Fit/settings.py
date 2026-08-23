@@ -15,7 +15,7 @@ ENV = os.getenv("ENV", "local")
 
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes", "t")
 
-ALLOWED_HOSTS = ["217.154.252.37", "127.0.0.1", "time4test.fit"]
+ALLOWED_HOSTS = ["time4.fit", "www.time4.fit", "100.107.138.47", "127.0.0.1", "localhost"]
 FRONT_LINK = os.environ.get("FRONT_LINK", "http://localhost:5173/event/invite/")
 
 INSTALLED_APPS = [

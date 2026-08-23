@@ -34,18 +34,53 @@ class CustomPagination(PageNumberPagination):
 
 class FastPageNumberPagination(PageNumberPagination):
     page_size = 20
+    page_query_param = 'page'
 
     def paginate_queryset(self, queryset, request, view=None):
         self.request = request
-        page_number = request.query_params.get(self.page_param, 1)
-        
         self.page_size = self.get_page_size(request)
-        offset = (int(page_number) - 1) * self.page_size
-        
+
+        try:
+            page_number = int(request.query_params.get(self.page_query_param, 1))
+            if page_number < 1:
+                page_number = 1
+        except (TypeError, ValueError):
+            page_number = 1
+
+        self.page_number = page_number
+        offset = (page_number - 1) * self.page_size
+
         results = list(queryset[offset : offset + self.page_size + 1])
-        self.has_next = len(results) > self.page_size
         
+        self.has_next = len(results) > self.page_size
+        self.has_previous = page_number > 1
+
         return results[:self.page_size]
+
+    def get_next_link(self):
+        if not self.has_next:
+            return None
+        url = self.request.build_absolute_uri()
+        page_number = self.page_number + 1
+        from rest_framework.utils.urls import replace_query_param
+        return replace_query_param(url, self.page_query_param, page_number)
+
+    def get_previous_link(self):
+        if not self.has_previous:
+            return None
+        url = self.request.build_absolute_uri()
+        page_number = self.page_number - 1
+        from rest_framework.utils.urls import replace_query_param, remove_query_param
+        if page_number == 1:
+            return remove_query_param(url, self.page_query_param)
+        return replace_query_param(url, self.page_query_param, page_number)
+
+    def get_paginated_response(self, data):
+        return Response({
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'results': data
+        })
 
 
 class DailyMealCalendarDetailView(GenericAPIView):

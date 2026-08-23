@@ -12,7 +12,8 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY is missing from environment variables!")
 
 ENV = os.getenv("ENV", "local")
-DEBUG = True
+
+DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes", "t")
 
 ALLOWED_HOSTS = ["217.154.252.37", "127.0.0.1", "time4test.fit"]
 FRONT_LINK = os.environ.get("FRONT_LINK", "http://localhost:5173/event/invite/")

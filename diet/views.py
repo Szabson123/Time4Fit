@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework.pagination import CursorPagination
-from django.db.models import OuterRef, Subquery, Value, F, DecimalField, ExpressionWrapper, Max, Prefetch, Sum
+from django.db.models import OuterRef, Subquery, Value, F, DecimalField, ExpressionWrapper, Max, Prefetch, Sum, Q
 from django.db.models.functions import Coalesce
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404

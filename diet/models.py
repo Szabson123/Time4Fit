@@ -98,11 +98,11 @@ class Product(models.Model):
 
     objects = ProductQuerySet.as_manager()
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["barcode"]),
-            models.Index(fields=["title", "brand"]),
-        ]
+    indexes = [
+        models.Index(fields=["barcode"]),
+        models.Index(fields=["title", "brand"]),
+        models.Index(fields=["user", "title", "id"], name="product_user_title_id_idx"),
+    ]
 
     def __str__(self):
         brand_prefix = f"[{self.brand}] " if self.brand else ""

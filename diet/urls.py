@@ -1,6 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DailyMealCalendarDetailView, AddProductToMealView, CreateCustomMealView, ProductListView
+from .views import (
+    DailyMealCalendarDetailView,
+    AddProductToMealView,
+    CreateCustomMealView,
+    ProductListView,
+    ProductDetailByBarcodeView,
+)
 
 
 urlpatterns = [
@@ -8,4 +14,6 @@ urlpatterns = [
     path('add-product/', AddProductToMealView.as_view(), name='add-product-to-meal'),
     path('add-meal/', CreateCustomMealView.as_view(), name='add-custom-meal'),
     path('products/', ProductListView.as_view(), name='product-list'),
-]
+    path('products/barcode/<str:barcode>/', ProductDetailByBarcodeView.as_view(), name='product-detail-barcode'),
+]
+

@@ -5,15 +5,41 @@ from django.db import transaction
 from django.db.models import CharField
 from django.contrib.postgres.fields import ArrayField
 
-from .models import MealItem, MealCategory, FullMeal, DailyMealCalendar, ProductServingUnit, Product
+from .models import (
+    MealItem, MealCategory, FullMeal, DailyMealCalendar,
+    ProductServingUnit, Product, ProductAdditionalInfo
+)
 
 
-class ProductListSerializer(serializers.ModelSerializer):
+class ProductAdditionalInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductAdditionalInfo
+        fields = [
+            'is_vegan',
+            'is_vegetarian',
+            'is_palm_oil_free',
+            'is_complete_profile',
+            'ingredients_text',
+            'traces',
+            'labels',
+            'additives_tags',
+        ]
+
+
+class ProductDetailSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='title', read_only=True)
-    packaging = serializers.SerializerMethodField()
-    weight_g = serializers.SerializerMethodField()
-    kcal = serializers.SerializerMethodField()
-    serving_unit_id = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True, allow_null=True)
+    serving_units = serializers.SerializerMethodField()
+    additional_info = ProductAdditionalInfoSerializer(read_only=True)
+
+    kcal_100g = serializers.SerializerMethodField()
+    protein_100g = serializers.SerializerMethodField()
+    fat_100g = serializers.SerializerMethodField()
+    carbohydrates_100g = serializers.SerializerMethodField()
+    salt_100g = serializers.SerializerMethodField()
+    sugars_100g = serializers.SerializerMethodField()
+    saturated_fat_100g = serializers.SerializerMethodField()
+    fiber_100g = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -22,61 +48,88 @@ class ProductListSerializer(serializers.ModelSerializer):
             'name',
             'title',
             'brand',
+            'barcode',
             'image_url',
-            'packaging',
-            'weight_g',
-            'kcal',
+            'quantity_display',
+            'category',
+            'category_name',
+            'package_name',
+            'package_whole_g',
+            'nutriscore',
+            'nova_group',
+            'allergens',
+            'countries',
             'kcal_1g',
-            'serving_unit_id',
+            'protein_1g',
+            'fat_1g',
+            'carbohydrates_1g',
+            'salt_1g',
+            'sugars_1g',
+            'saturated_fat_1g',
+            'fiber_1g',
+            'kcal_100g',
+            'protein_100g',
+            'fat_100g',
+            'carbohydrates_100g',
+            'salt_100g',
+            'sugars_100g',
+            'saturated_fat_100g',
+            'fiber_100g',
+            'serving_units',
+            'additional_info',
         ]
 
-    def _get_packaging_data(self, obj):
-        if hasattr(obj, '_packaging_data'):
-            return obj._packaging_data
+    def get_serving_units(self, obj):
+        return ProductServingUnitSerializer(obj.serving_units.all(), many=True).data
 
-        serving_unit = None
-        if hasattr(obj, '_prefetched_objects_cache') and 'serving_units' in obj._prefetched_objects_cache:
-            units = list(obj.serving_units.all())
-            serving_unit = units[0] if len(units) > 0 else None
-        else:
-            serving_unit = obj.serving_units.first()
+    def get_kcal_100g(self, obj):
+        return round(obj.kcal_1g * 100, 2) if obj.kcal_1g is not None else None
 
-        if serving_unit:
-            packaging = serving_unit.custom_label or serving_unit.get_unit_name_display() or serving_unit.unit_name
-            weight_g = Decimal(str(serving_unit.gram_weight))
-            serving_unit_id = serving_unit.id
-        elif obj.package_whole_g is not None and obj.package_whole_g > 0:
-            packaging = obj.package_name or "Opakowanie"
-            weight_g = Decimal(str(obj.package_whole_g))
-            serving_unit_id = None
-        else:
-            packaging = "100g"
-            weight_g = Decimal("100.00")
-            serving_unit_id = None
+    def get_protein_100g(self, obj):
+        return round(obj.protein_1g * 100, 2) if obj.protein_1g is not None else None
 
-        kcal = round(weight_g * Decimal(str(obj.kcal_1g)), 2)
+    def get_fat_100g(self, obj):
+        return round(obj.fat_1g * 100, 2) if obj.fat_1g is not None else None
 
-        data = {
-            'packaging': packaging,
-            'weight_g': weight_g,
-            'kcal': kcal,
-            'serving_unit_id': serving_unit_id,
-        }
-        obj._packaging_data = data
-        return data
+    def get_carbohydrates_100g(self, obj):
+        return round(obj.carbohydrates_1g * 100, 2) if obj.carbohydrates_1g is not None else None
+
+    def get_salt_100g(self, obj):
+        return round(obj.salt_1g * 100, 2) if obj.salt_1g is not None else None
+
+    def get_sugars_100g(self, obj):
+        return round(obj.sugars_1g * 100, 2) if obj.sugars_1g is not None else None
+
+    def get_saturated_fat_100g(self, obj):
+        return round(obj.saturated_fat_1g * 100, 2) if obj.saturated_fat_1g is not None else None
+
+    def get_fiber_100g(self, obj):
+        return round(obj.fiber_1g * 100, 2) if obj.fiber_1g is not None else None
+
+
+
+class ProductListSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source='title', read_only=True)
+    weight_g = serializers.DecimalField(source='calc_weight', max_digits=8, decimal_places=2, read_only=True)
+    kcal = serializers.DecimalField(source='calc_kcal', max_digits=10, decimal_places=2, read_only=True)
+    serving_unit_id = serializers.IntegerField(source='first_unit_id', read_only=True)
+    packaging = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Product
+        fields = [
+            'id', 'name', 'title', 'brand', 'image_url',
+            'packaging', 'weight_g', 'kcal', 'kcal_1g', 'serving_unit_id'
+        ]
 
     def get_packaging(self, obj):
-        return self._get_packaging_data(obj)['packaging']
-
-    def get_weight_g(self, obj):
-        return self._get_packaging_data(obj)['weight_g']
-
-    def get_kcal(self, obj):
-        return self._get_packaging_data(obj)['kcal']
-
-    def get_serving_unit_id(self, obj):
-        return self._get_packaging_data(obj)['serving_unit_id']
-
+        if obj.first_unit_label:
+            return obj.first_unit_label
+        if obj.first_unit_name:
+            return obj.first_unit_name
+        if obj.package_whole_g:
+            return obj.package_name or "Opakowanie"
+        return "100g"
 
 
 class ProductServingUnitSerializer(serializers.ModelSerializer):

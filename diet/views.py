@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField, Sum, CharField, Q, Value, Max
+from django.db.models import OuterRef, Subquery, Case, When, Value, F, DecimalField, Sum, Prefetch, ExpressionWrapper, Q
+from django.db.models.functions import Coalesce
 from django.contrib.postgres.fields import ArrayField
 from django.db.models.functions import Coalesce
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -7,7 +8,7 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework import status
 
@@ -19,6 +20,7 @@ from .serializers import (
     CreateCustomMealSerializer,
     MealCategorySerializer,
     ProductListSerializer,
+    ProductDetailSerializer,
 )
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
 
@@ -28,6 +30,22 @@ from datetime import datetime
 class CustomPagination(PageNumberPagination):
     page_size = 20
     max_page_size = 60
+
+
+class FastPageNumberPagination(PageNumberPagination):
+    page_size = 20
+
+    def paginate_queryset(self, queryset, request, view=None):
+        self.request = request
+        page_number = request.query_params.get(self.page_param, 1)
+        
+        self.page_size = self.get_page_size(request)
+        offset = (int(page_number) - 1) * self.page_size
+        
+        results = list(queryset[offset : offset + self.page_size + 1])
+        self.has_next = len(results) > self.page_size
+        
+        return results[:self.page_size]
 
 
 class DailyMealCalendarDetailView(GenericAPIView):
@@ -216,12 +234,52 @@ class CreateCustomMealView(GenericAPIView):
 class ProductListView(ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [IsAuthenticated]
-    pagination_class = CustomPagination
+    pagination_class = FastPageNumberPagination
+
+    def get_queryset(self):
+        first_serving = ProductServingUnit.objects.filter(
+            product=OuterRef('pk')
+        ).order_by('id')
+
+        return (
+            Product.objects
+            .filter(user__isnull=True)
+            .annotate(
+                first_unit_id=Subquery(first_serving.values('id')[:1]),
+                first_unit_label=Subquery(first_serving.values('custom_label')[:1]),
+                first_unit_name=Subquery(first_serving.values('unit_name')[:1]),
+                first_unit_weight=Subquery(first_serving.values('gram_weight')[:1]),
+            )
+            .annotate(
+                calc_weight=Coalesce(
+                    F('first_unit_weight'),
+                    F('package_whole_g'),
+                    Value(100.0),
+                    output_field=DecimalField()
+                )
+            )
+            .annotate(
+                calc_kcal=ExpressionWrapper(
+                    F('calc_weight') * F('kcal_1g'),
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                )
+            )
+            .only('id', 'title', 'brand', 'image_url', 'kcal_1g', 'package_name', 'package_whole_g')
+            .order_by('title', 'id')
+        )
+
+
+class ProductDetailByBarcodeView(RetrieveAPIView):
+    serializer_class = ProductDetailSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'barcode'
+    lookup_url_kwarg = 'barcode'
 
     def get_queryset(self):
         return (
             Product.objects
-            .filter(user__isnull=True)
+            .filter(Q(user__isnull=True) | Q(user=self.request.user))
+            .select_related('category', 'additional_info')
             .prefetch_related('serving_units')
-            .order_by('title', 'id')
-        )
+        )
+

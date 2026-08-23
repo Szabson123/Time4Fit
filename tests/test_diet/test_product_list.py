@@ -173,3 +173,83 @@ def test_product_list_pagination(auth_api_client):
     assert len(page2_response.data["results"]) == 5
     assert page2_response.data["next"] is None
     assert page2_response.data["previous"] is not None
+
+
+@pytest.mark.django_db
+def test_get_product_by_barcode_happy_path(auth_api_client):
+    client, _ = auth_api_client
+
+    product = Product.objects.create(
+        title="Baton Proteinowy",
+        brand="FitBrand",
+        barcode="5901234567890",
+        kcal_1g=Decimal("4.00000"),
+        protein_1g=Decimal("0.30000"),
+        fat_1g=Decimal("0.15000"),
+        carbohydrates_1g=Decimal("0.35000"),
+        salt_1g=Decimal("0.00500"),
+        user=None,
+        package_whole_g=Decimal("60.00"),
+        package_name="Baton 60g",
+    )
+    unit = ProductServingUnit.objects.create(
+        product=product,
+        unit_name="piece",
+        custom_label="1 baton",
+        gram_weight=Decimal("60.00"),
+    )
+    from diet.models import ProductAdditionalInfo
+    ProductAdditionalInfo.objects.create(
+        product=product,
+        is_vegan=True,
+        is_vegetarian=True,
+        ingredients_text="Białko sojowe, czekolada",
+    )
+
+    url = f"/diet/products/barcode/{product.barcode}/"
+    response = client.get(url)
+    assert response.status_code == 200
+
+    data = response.data
+    assert data["id"] == product.id
+    assert data["title"] == "Baton Proteinowy"
+    assert data["brand"] == "FitBrand"
+    assert data["barcode"] == "5901234567890"
+    assert Decimal(str(data["kcal_100g"])) == Decimal("400.00")
+    assert Decimal(str(data["protein_100g"])) == Decimal("30.00")
+    assert len(data["serving_units"]) == 1
+    assert data["serving_units"][0]["label"] == "1 baton"
+    assert data["additional_info"]["is_vegan"] is True
+    assert data["additional_info"]["ingredients_text"] == "Białko sojowe, czekolada"
+
+
+@pytest.mark.django_db
+def test_get_product_by_barcode_not_found(auth_api_client):
+    client, _ = auth_api_client
+
+    url = "/diet/products/barcode/9999999999999/"
+    response = client.get(url)
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_get_product_by_barcode_user_owned_product(auth_api_client):
+    client, user = auth_api_client
+
+    product = Product.objects.create(
+        title="Własny chleb orkiszowy",
+        barcode="5900000000001",
+        kcal_1g=Decimal("2.20000"),
+        protein_1g=Decimal("0.08000"),
+        fat_1g=Decimal("0.02000"),
+        carbohydrates_1g=Decimal("0.45000"),
+        salt_1g=Decimal("0.01000"),
+        user=user,
+    )
+
+    url = f"/diet/products/barcode/{product.barcode}/"
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.data["id"] == product.id
+    assert response.data["title"] == "Własny chleb orkiszowy"
+

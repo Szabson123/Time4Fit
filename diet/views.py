@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField, Sum, CharField, Q, Value
+from django.db.models import Prefetch, F, ExpressionWrapper, DecimalField, Sum, CharField, Q, Value, Max
 from django.contrib.postgres.fields import ArrayField
 from django.db.models.functions import Coalesce
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -11,7 +11,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework import status
 
 from django.db import transaction
-from .serializers import DailyMealCalendarSerializer, AddProductToMealSerializer, MealItemSerializer, CreateCustomMealSerializer
+from .serializers import DailyMealCalendarSerializer, AddProductToMealSerializer, MealItemSerializer, CreateCustomMealSerializer, MealCategorySerializer
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
 
 from datetime import datetime

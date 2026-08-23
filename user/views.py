@@ -50,8 +50,7 @@ class UserRegisterView(GenericAPIView):
                 expires_at = default_expires(ttl_sec)
             )
 
-            message = f"Witaj w Time4Fit twój kod do rejestracji to {code_plain}"
-            send_welcome_email.delay(email, message)
+            send_welcome_email.delay(email, code_plain, purpose="register")
 
         return Response({
             "challenge_id": str(challenge.id),
@@ -83,8 +82,7 @@ class UserLoginView(GenericAPIView):
                 expires_at=default_expires(sec_ttl)
             )
             
-        message = f"Witaj w Time4Fit twój kod do logowania to {code_plain}"
-        send_welcome_email.delay(user.email, message)
+        send_welcome_email.delay(user.email, code_plain, purpose="login")
 
         return Response({
             "challenge_id": str(challenge.id),
@@ -125,8 +123,7 @@ class ResetPasswordView(GenericAPIView):
             expires_at=default_expires(sec_ttl)
         )
 
-        message = f"Twój kod do zmiany hasła: {code_plain}"
-        send_welcome_email.delay(email, message)
+        send_welcome_email.delay(email, code_plain, purpose="reset_password")
 
         return Response({
             "detail": "Jeśli ten e-mail istnieje, wyślemy kod.",

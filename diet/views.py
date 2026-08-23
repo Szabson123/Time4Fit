@@ -1,9 +1,8 @@
 from django.shortcuts import render
-from django.db.models import OuterRef, Subquery, Case, When, Value, F, DecimalField, Sum, Prefetch, ExpressionWrapper, Q
+from rest_framework.pagination import CursorPagination
+from django.db.models import OuterRef, Subquery, Value, F, DecimalField, ExpressionWrapper, Max
 from django.db.models.functions import Coalesce
-from django.contrib.postgres.fields import ArrayField
 from django.db.models.functions import Coalesce
-from django.contrib.postgres.aggregates import ArrayAgg
 from django.shortcuts import get_object_or_404
 
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -25,11 +24,6 @@ from .serializers import (
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
 
 from datetime import datetime
-
-
-class ProductCursorPagination(CursorPagination):
-    page_size = 20
-    ordering = ('title', 'id')
 
 
 class DailyMealCalendarDetailView(GenericAPIView):
@@ -215,10 +209,14 @@ class CreateCustomMealView(GenericAPIView):
         return Response(out_serializer.data, status=status.HTTP_201_CREATED)
 
 
+class ProductCursorPagination(CursorPagination):
+    page_size = 20
+    ordering = ('title', 'id')
+
 class ProductListView(ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [AllowAny]
-    pagination_class = CursorPagination
+    pagination_class = ProductCursorPagination
 
     def get_queryset(self):
         first_serving = ProductServingUnit.objects.filter(

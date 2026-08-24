@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models import F, ExpressionWrapper, DecimalField, Case, When, Value
+from django.db.models import F, ExpressionWrapper, DecimalField, Case, When, Value, Q
 from django.db.models.functions import Coalesce
 from user.models import CentralUser
 from decimal import Decimal, ROUND_HALF_UP
@@ -103,11 +103,13 @@ class Product(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["barcode"]),
-            models.Index(fields=["title", "brand"]),
-            models.Index(fields=["user", "title", "id"], name="product_user_title_id_idx"),
-            GinIndex(fields=['title'], opclasses=['gin_trgm_ops'], name='prod_title_trgm_idx'),
-            GinIndex(fields=['brand'], opclasses=['gin_trgm_ops'], name='prod_brand_trgm_idx'),
             models.Index(fields=["-popularity", "-id"], name="product_pop_id_idx"),
+            GinIndex(
+                name='product_title_trgm_gin_idx',
+                fields=['title'],
+                opclasses=['gin_trgm_ops'],
+                condition=Q(user__isnull=True),
+            ),
         ]
 
     def __str__(self):

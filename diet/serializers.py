@@ -110,27 +110,61 @@ class ProductDetailSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source='title', read_only=True)
-    weight_g = serializers.DecimalField(source='calc_weight', max_digits=8, decimal_places=2, read_only=True)
-    kcal = serializers.DecimalField(source='calc_kcal', max_digits=10, decimal_places=2, read_only=True)
-    serving_unit_id = serializers.IntegerField(source='first_unit_id', read_only=True)
     packaging = serializers.SerializerMethodField()
+    weight_g = serializers.SerializerMethodField()
+    kcal = serializers.SerializerMethodField()
+    serving_unit_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = [
-            'id', 'name', 'title', 'brand', 'image_url',
-            'packaging', 'weight_g', 'kcal', 'kcal_1g', 'serving_unit_id'
+            'id',
+            'name',
+            'title',
+            'brand',
+            'image_url',
+            'packaging',
+            'weight_g',
+            'kcal',
+            'kcal_1g',
+            'serving_unit_id',
         ]
 
+    def _get_first_serving(self, obj):
+        servings = getattr(obj, 'prefetched_servings', [])
+        return servings[0] if servings else None
+
+    def _get_weight(self, obj):
+        unit = self._get_first_serving(obj)
+        if unit and unit.gram_weight is not None:
+            return unit.gram_weight
+        if obj.package_whole_g is not None:
+            return obj.package_whole_g
+        return Decimal('100.00')
+
     def get_packaging(self, obj):
-        if obj.first_unit_label:
-            return obj.first_unit_label
-        if obj.first_unit_name:
-            return obj.first_unit_name
-        if obj.package_whole_g:
-            return obj.package_name or "Opakowanie"
+        unit = self._get_first_serving(obj)
+        if unit:
+            return unit.custom_label or unit.get_unit_name_display()
+        if obj.package_name:
+            return obj.package_name
         return "100g"
 
+    def get_weight_g(self, obj):
+        weight = self._get_weight(obj)
+        return f"{Decimal(weight):.2f}"
+
+    def get_kcal(self, obj):
+        if obj.kcal_1g is None:
+            return None
+        weight = self._get_weight(obj)
+        total_kcal = Decimal(weight) * Decimal(obj.kcal_1g)
+        return f"{total_kcal:.2f}"
+
+    def get_serving_unit_id(self, obj):
+        unit = self._get_first_serving(obj)
+        return unit.id if unit else None
+    
 
 class ProductServingUnitSerializer(serializers.ModelSerializer):
     unit_code = serializers.CharField(source='unit_name')

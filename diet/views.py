@@ -12,6 +12,9 @@ from rest_framework.pagination import PageNumberPagination, CursorPagination
 from rest_framework.filters import SearchFilter
 from rest_framework import status
 
+import time
+from django.db import connection
+
 
 from django.db import transaction
 from .serializers import (
@@ -220,67 +223,59 @@ class ProductListView(ListAPIView):
     permission_classes = [AllowAny]
     pagination_class = ProductCursorPagination
 
-    def get_annotated_queryset(self, base_qs):
-        first_serving = ProductServingUnit.objects.filter(
-            product=OuterRef('pk')
-        ).order_by('id')
-
-        return (
-            base_qs
-            .annotate(
-                first_unit_id=Subquery(first_serving.values('id')[:1]),
-                first_unit_label=Subquery(first_serving.values('custom_label')[:1]),
-                first_unit_name=Subquery(first_serving.values('unit_name')[:1]),
-                first_unit_weight=Subquery(first_serving.values('gram_weight')[:1]),
-            )
-            .annotate(
-                calc_weight=Coalesce(
-                    F('first_unit_weight'),
-                    F('package_whole_g'),
-                    Value(100.0),
-                    output_field=DecimalField()
-                ),
-                calc_kcal=ExpressionWrapper(
-                    F('calc_weight') * F('kcal_1g'),
-                    output_field=DecimalField(max_digits=10, decimal_places=2)
-                )
-            )
-            .only('id', 'title', 'brand', 'image_url', 'kcal_1g', 'package_name', 'package_whole_g', 'popularity')
+    def _get_servings_prefetch(self):
+        return Prefetch(
+            'serving_units',
+            queryset=ProductServingUnit.objects.order_by('id'),
+            to_attr='prefetched_servings'
         )
 
     def list(self, request, *args, **kwargs):
-        query = request.query_params.get('search', '').strip()
-        
-        if query:
-            matching_ids = list(
-                Product.objects
-                .filter(user__isnull=True, title__icontains=query)
-                .order_by('-popularity', '-id')
-                .values_list('id', flat=True)[:50]
-            )
+        raw_query = request.query_params.get('search', '').strip()
+
+        if raw_query:
+            clean_query = raw_query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id 
+                    FROM diet_product 
+                    WHERE title ILIKE %s AND user_id IS NULL
+                    """,
+                    [f'%{clean_query}%']
+                )
+                matching_ids = [row[0] for row in cursor.fetchall()]
 
             if not matching_ids:
                 return Response([])
 
-            qs = self.get_annotated_queryset(
-                Product.objects.filter(id__in=matching_ids)
-            ).order_by('-popularity', '-id')
+            qs = (
+                Product.objects
+                .filter(id__in=matching_ids)
+                .prefetch_related(self._get_servings_prefetch())
+                .order_by('-popularity', '-id')[:50]
+            )
 
             serializer = self.get_serializer(qs, many=True)
             return Response(serializer.data)
 
-        base_qs = Product.objects.filter(user__isnull=True).order_by('-popularity', '-id')
-        queryset = self.get_annotated_queryset(base_qs)
+        base_qs = (
+            Product.objects
+            .filter(user__isnull=True)
+            .prefetch_related(self._get_servings_prefetch())
+            .order_by('-popularity', '-id')
+        )
 
-        page = self.paginate_queryset(queryset)
+        page = self.paginate_queryset(base_qs)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
 
-        serializer = self.get_serializer(queryset, many=True)
+        serializer = self.get_serializer(base_qs, many=True)
         return Response(serializer.data)
-    
 
+        
 class ProductDetailByBarcodeView(RetrieveAPIView):
     serializer_class = ProductDetailSerializer
     permission_classes = [IsAuthenticated]

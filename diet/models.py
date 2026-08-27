@@ -129,6 +129,18 @@ class ProductAdditionalInfo(models.Model):
     additives_tags = models.JSONField(default=list, blank=True, help_text="Lista dodatków E: ['e322', 'e330']")
 
 
+class ProductDescription(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='descriptions')
+    language = models.CharField(max_length=10, default='pl', db_index=True)
+    description = models.TextField()
+
+    class Meta:
+        unique_together = ('product', 'language')
+
+    def __str__(self):
+        return f"{self.product.title} [{self.language}]"
+
+
 class ProductServingUnit(models.Model):
     UNIT_CHOICES = [
         ('g', 'Gram'),

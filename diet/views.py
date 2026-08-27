@@ -366,6 +366,26 @@ class ProductListView(ListAPIView):
         return Response(serializer.data)
 
         
+class ProductDetailView(RetrieveAPIView):
+    serializer_class = ProductDetailSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'pk'
+
+    def get_queryset(self):
+        return (
+            Product.objects
+            .filter(Q(user__isnull=True) | Q(user=self.request.user))
+            .select_related('category', 'additional_info')
+            .prefetch_related('serving_units', 'descriptions', 'dishes', 'dishes__category')
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        trigger_product_popularity_increment(instance.id, points=2)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+
 class ProductDetailByBarcodeView(RetrieveAPIView):
     serializer_class = ProductDetailSerializer
     permission_classes = [IsAuthenticated]
@@ -377,6 +397,12 @@ class ProductDetailByBarcodeView(RetrieveAPIView):
             Product.objects
             .filter(Q(user__isnull=True) | Q(user=self.request.user))
             .select_related('category', 'additional_info')
-            .prefetch_related('serving_units')
+            .prefetch_related('serving_units', 'descriptions', 'dishes', 'dishes__category')
         )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        trigger_product_popularity_increment(instance.id, points=2)
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 

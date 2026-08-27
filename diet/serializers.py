@@ -30,6 +30,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True, allow_null=True)
     serving_units = serializers.SerializerMethodField()
     additional_info = ProductAdditionalInfoSerializer(read_only=True)
+    product_desc = serializers.SerializerMethodField()
+    recipes = serializers.SerializerMethodField()
 
     kcal_100g = serializers.SerializerMethodField()
     protein_100g = serializers.SerializerMethodField()
@@ -52,6 +54,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'quantity_display',
             'category',
             'category_name',
+            'product_desc',
             'package_name',
             'package_whole_g',
             'nutriscore',
@@ -76,6 +79,32 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'fiber_100g',
             'serving_units',
             'additional_info',
+            'recipes',
+        ]
+
+    def get_product_desc(self, obj):
+        request = self.context.get('request')
+        lang = 'pl'
+        if request:
+            lang = request.query_params.get('lang') or getattr(request.user, 'language', 'pl') or 'pl'
+        
+        desc = obj.descriptions.filter(language=lang).first()
+        if not desc and lang != 'pl':
+            desc = obj.descriptions.filter(language='pl').first()
+        if not desc:
+            desc = obj.descriptions.first()
+        return desc.description if desc else None
+
+    def get_recipes(self, obj):
+        dishes = obj.dishes.all()[:10]
+        return [
+            {
+                "id": dish.id,
+                "name": dish.name,
+                "img": dish.img.url if dish.img else None,
+                "category": dish.category.name if dish.category else None,
+            }
+            for dish in dishes
         ]
 
     def get_serving_units(self, obj):

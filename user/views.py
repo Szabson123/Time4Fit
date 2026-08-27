@@ -3,6 +3,8 @@ from django.db.models import Exists, OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 import uuid
 
+from django.conf import settings
+
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
@@ -85,16 +87,23 @@ class UserLoginView(GenericAPIView):
                 expires_at=default_expires(sec_ttl)
             )
             
-        try:
-            send_welcome_email.delay(user.email, code_plain, "login")
-        except Exception:
-            send_welcome_email(user.email, code_plain, "login")
+        if not settings.DEBUG:
+            try:
+                send_welcome_email.delay(user.email, code_plain, "login")
+            except Exception:
+                send_welcome_email(user.email, code_plain, "login")
 
-        return Response({
+        response_payload = {
             "challenge_id": str(challenge.id),
             "time_valid": minutes_valid,
             "purpose": "login"
-        }, status=status.HTTP_201_CREATED)
+        }
+
+        # W developmencie dołączasz kod wprost do JSON-a
+        if settings.DEBUG:
+            response_payload["dev_code"] = code_plain
+
+        return Response(response_payload, status=status.HTTP_201_CREATED)
 
 
 class ResetPasswordView(GenericAPIView):
@@ -141,7 +150,6 @@ class ResetPasswordView(GenericAPIView):
 
 
 class OtpVerifyView(GenericAPIView):
-
     serializer_class = OtpVerifySerializer
 
     def post(self, request):

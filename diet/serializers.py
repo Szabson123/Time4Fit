@@ -1,8 +1,7 @@
 from decimal import Decimal
 from rest_framework import serializers
 from django.db import transaction
-
-from django.db.models import CharField
+from django.db.models import CharField, Q
 from django.contrib.postgres.fields import ArrayField
 
 from .models import (
@@ -80,7 +79,12 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_serving_units(self, obj):
-        return ProductServingUnitSerializer(obj.serving_units.all(), many=True).data
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
+        filter_q = Q(is_global=True)
+        if user:
+            filter_q |= Q(created_by=user)
+        return ProductServingUnitSerializer(obj.serving_units.filter(filter_q), many=True).data
 
     def get_kcal_100g(self, obj):
         return round(obj.kcal_1g * 100, 2) if obj.kcal_1g is not None else None
@@ -219,16 +223,21 @@ class MealCategorySerializer(serializers.ModelSerializer):
     category_fat = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     category_carbohydrates = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     category_salt = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
+    name = serializers.SerializerMethodField()
 
     class Meta:
         model = MealCategory
         fields = [
-            'id', 'meal_type', 'meal_type_display', 'name', 'order', 
+            'id', 'meal_type', 'name', 'order', 
             'category_kcal', 'category_protein', 'category_fat', 
             'category_carbohydrates', 'category_salt', 
             'full_meals', 'direct_items'
         ]
+
+    def get_name(self, obj):
+        if obj.meal_type <= 5:
+            return None
+        return obj.name
 
 
 class AddProductToMealSerializer(serializers.Serializer):
@@ -236,8 +245,10 @@ class AddProductToMealSerializer(serializers.Serializer):
     date = serializers.DateField(required=True)
     meal_type = serializers.IntegerField(min_value=1, required=True)
 
-    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=1.0)
+    amount = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=Decimal('1.00'))
     serving_unit_id = serializers.IntegerField(required=False, allow_null=True)
+    custom_weight_g = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    custom_unit_label = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     calculated_gram_weight = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
 
 

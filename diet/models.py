@@ -224,12 +224,8 @@ class MealCategory(models.Model):
         ordering = ['order']
 
     def save(self, *args, **kwargs):
-        if not self.name and self.meal_type:
-            dict_choices = dict(self.MEAL_TYPE_CHOICES)
-            if self.meal_type in dict_choices:
-                self.name = dict_choices[self.meal_type]
-            else:
-                self.name = f"Posiłek {self.meal_type}"
+        if not self.name and self.meal_type and self.meal_type > 5:
+            self.name = f"Posiłek {self.meal_type}"
         super().save(*args, **kwargs)
 
 

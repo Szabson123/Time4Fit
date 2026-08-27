@@ -35,7 +35,7 @@ def test_add_product_creates_day_and_meal_standard(auth_api_client, sample_produ
 
     meal = MealCategory.objects.filter(calendar=calendar, meal_type=1).first()
     assert meal is not None
-    assert meal.name == "Śniadanie"
+    assert meal.name is None
 
     item = MealItem.objects.filter(meal_category=meal, original_product=sample_product).first()
     assert item is not None
@@ -132,3 +132,61 @@ def test_add_product_to_existing_meal(auth_api_client, sample_product):
 
     assert MealCategory.objects.filter(calendar=calendar, meal_type=3).count() == 1
     assert MealItem.objects.filter(meal_category=meal).count() == 1
+
+
+@pytest.mark.django_db
+def test_add_product_with_custom_weight_creates_user_serving_unit(auth_api_client, sample_product):
+    client, user = auth_api_client
+
+    url = "/api/v1/diet/add-product/"
+    payload = {
+        "product_id": sample_product.id,
+        "date": "2026-08-20",
+        "meal_type": 1,
+        "amount": 1.0,
+        "custom_weight_g": 40.0,
+    }
+
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 201
+
+    # Check that ProductServingUnit was created for this user
+    unit = ProductServingUnit.objects.filter(product=sample_product, created_by=user, gram_weight=40.0).first()
+    assert unit is not None
+    assert unit.custom_label == "40g"
+    assert unit.is_global is False
+
+    # Check MealItem has unit and correct weight
+    meal_item = MealItem.objects.filter(product_serving_unit=unit).first()
+    assert meal_item is not None
+    assert float(meal_item.calculated_gram_weight) == 40.0
+
+
+@pytest.mark.django_db
+def test_add_product_quick_plus_default_serving(auth_api_client, sample_product):
+    client, user = auth_api_client
+
+    # Add default global serving unit to product
+    default_unit = ProductServingUnit.objects.create(
+        product=sample_product,
+        unit_name="cup",
+        custom_label="Szklanka (250ml)",
+        gram_weight=Decimal("250.00"),
+        is_global=True,
+    )
+
+    url = "/api/v1/diet/add-product/"
+    payload = {
+        "product_id": sample_product.id,
+        "date": "2026-08-20",
+        "meal_type": 1,
+        # No amount, no serving_unit_id, no custom_weight_g passed (quick plus click)
+    }
+
+    response = client.post(url, payload, format="json")
+    assert response.status_code == 201
+
+    meal_item = MealItem.objects.filter(original_product=sample_product, product_serving_unit=default_unit).first()
+    assert meal_item is not None
+    assert float(meal_item.calculated_gram_weight) == 250.0
+

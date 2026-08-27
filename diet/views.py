@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.shortcuts import render
 from rest_framework.pagination import CursorPagination
 from django.db.models import OuterRef, Subquery, Value, F, DecimalField, ExpressionWrapper, Max, Prefetch, Sum, Q
@@ -29,6 +30,22 @@ from .serializers import (
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
 
 from datetime import datetime
+
+
+def get_empty_meal_slot(meal_type: int):
+    return {
+        "id": None,
+        "meal_type": meal_type,
+        "name": None,
+        "order": meal_type,
+        "category_kcal": "0.00",
+        "category_protein": "0.00",
+        "category_fat": "0.00",
+        "category_carbohydrates": "0.00",
+        "category_salt": "0.00",
+        "full_meals": [],
+        "direct_items": [],
+    }
 
 
 class DailyMealCalendarDetailView(GenericAPIView):
@@ -82,9 +99,39 @@ class DailyMealCalendarDetailView(GenericAPIView):
         except ValueError:
             return Response({"detail": "Niepoprawny format daty."}, status=status.HTTP_400_BAD_REQUEST)
 
-        calendar_day = get_object_or_404(self.get_queryset(), date=target_date)
+        calendar_day = self.get_queryset().filter(date=target_date).first()
+
+        if not calendar_day:
+            empty_data = {
+                "id": None,
+                "date": target_date.strftime("%Y-%m-%d"),
+                "total_day_kcal": "0.00",
+                "total_day_protein": "0.00",
+                "total_day_fat": "0.00",
+                "total_day_carbohydrates": "0.00",
+                "total_day_salt": "0.00",
+                "meals": [get_empty_meal_slot(i) for i in range(1, 6)],
+            }
+            return Response(empty_data, status=status.HTTP_200_OK)
+
         serializer = self.get_serializer(calendar_day)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        data = serializer.data
+
+        existing_meals = data.get('meals', [])
+        existing_meals_by_type = {m['meal_type']: m for m in existing_meals}
+
+        filled_meals = []
+        for i in range(1, 6):
+            if i in existing_meals_by_type:
+                filled_meals.append(existing_meals_by_type[i])
+            else:
+                filled_meals.append(get_empty_meal_slot(i))
+
+        custom_meals = [m for m in existing_meals if m['meal_type'] >= 6]
+        custom_meals.sort(key=lambda m: (m.get('order') or m['meal_type'], m['meal_type']))
+
+        data['meals'] = filled_meals + custom_meals
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class AddProductToMealView(GenericAPIView):
@@ -100,8 +147,10 @@ class AddProductToMealView(GenericAPIView):
         product_id = data['product_id']
         target_date = data['date']
         meal_type = data['meal_type']
-        amount = data.get('amount', 1.0)
+        amount = data.get('amount', Decimal('1.00'))
         serving_unit_id = data.get('serving_unit_id')
+        custom_weight_g = data.get('custom_weight_g')
+        custom_unit_label = data.get('custom_unit_label')
         calc_gram_weight = data.get('calculated_gram_weight')
 
         product = get_object_or_404(Product, id=product_id)
@@ -112,8 +161,6 @@ class AddProductToMealView(GenericAPIView):
         )
 
         if meal_type <= 5:
-            dict_choices = dict(MealCategory.MEAL_TYPE_CHOICES)
-            meal_name = dict_choices.get(meal_type)
             meal_category = MealCategory.objects.filter(
                 calendar=calendar_day,
                 meal_type=meal_type
@@ -122,7 +169,7 @@ class AddProductToMealView(GenericAPIView):
                 meal_category = MealCategory.objects.create(
                     calendar=calendar_day,
                     meal_type=meal_type,
-                    name=meal_name,
+                    name=None,
                     order=meal_type
                 )
         else:
@@ -137,15 +184,52 @@ class AddProductToMealView(GenericAPIView):
                 )
 
         serving_unit = None
-        if serving_unit_id:
-            serving_unit = get_object_or_404(ProductServingUnit, id=serving_unit_id, product=product)
 
-        if calc_gram_weight is not None:
-            final_gram_weight = calc_gram_weight
-        elif serving_unit:
+        if custom_weight_g is not None:
+            # Użytkownik ręcznie wpisał wagę (np. 40g) -> zapisujemy/przypisujemy ProductServingUnit dla tego usera
+            label = (custom_unit_label or "").strip()
+            if not label:
+                if custom_weight_g == int(custom_weight_g):
+                    label = f"{int(custom_weight_g)}g"
+                else:
+                    label = f"{custom_weight_g}g"
+
+            serving_unit, _ = ProductServingUnit.objects.get_or_create(
+                product=product,
+                created_by=request.user,
+                gram_weight=custom_weight_g,
+                defaults={
+                    'unit_name': 'custom',
+                    'custom_label': label,
+                    'is_global': False,
+                }
+            )
+            final_gram_weight = amount * custom_weight_g
+        elif serving_unit_id:
+            serving_unit = get_object_or_404(
+                ProductServingUnit.objects.filter(Q(is_global=True) | Q(created_by=request.user)),
+                id=serving_unit_id,
+                product=product
+            )
             final_gram_weight = amount * serving_unit.gram_weight
+        elif calc_gram_weight is not None:
+            final_gram_weight = calc_gram_weight
         else:
-            final_gram_weight = amount
+            # Domyślne dodanie (np. plusik lub podana waga w amount)
+            default_serving = product.serving_units.filter(
+                Q(is_global=True) | Q(created_by=request.user)
+            ).order_by('id').first()
+
+            if default_serving:
+                serving_unit = default_serving
+                final_gram_weight = amount * default_serving.gram_weight
+            elif product.package_whole_g is not None:
+                final_gram_weight = amount * product.package_whole_g
+            else:
+                if amount == Decimal('1.00') or amount == Decimal('1.0') or amount == 1:
+                    final_gram_weight = Decimal('100.00')
+                else:
+                    final_gram_weight = amount
 
         meal_item = MealItem.objects.create(
             meal_category=meal_category,
@@ -223,10 +307,13 @@ class ProductListView(ListAPIView):
     permission_classes = [AllowAny]
     pagination_class = ProductCursorPagination
 
-    def _get_servings_prefetch(self):
+    def _get_servings_prefetch(self, user=None):
+        filter_q = Q(is_global=True)
+        if user and user.is_authenticated:
+            filter_q |= Q(created_by=user)
         return Prefetch(
             'serving_units',
-            queryset=ProductServingUnit.objects.order_by('id'),
+            queryset=ProductServingUnit.objects.filter(filter_q).order_by('id'),
             to_attr='prefetched_servings'
         )
 
@@ -253,7 +340,7 @@ class ProductListView(ListAPIView):
             qs = (
                 Product.objects
                 .filter(id__in=matching_ids)
-                .prefetch_related(self._get_servings_prefetch())
+                .prefetch_related(self._get_servings_prefetch(request.user))
                 .order_by('-popularity', '-id')[:50]
             )
 
@@ -263,7 +350,7 @@ class ProductListView(ListAPIView):
         base_qs = (
             Product.objects
             .filter(user__isnull=True)
-            .prefetch_related(self._get_servings_prefetch())
+            .prefetch_related(self._get_servings_prefetch(request.user))
             .order_by('-popularity', '-id')
         )
 

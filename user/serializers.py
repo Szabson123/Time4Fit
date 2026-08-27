@@ -6,8 +6,8 @@ from user_profile.serializers import UserProfileSerializer
 
 class RegisterUserSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField()
-    last_name = serializers.CharField()
-    phone_number = serializers.CharField()
+    last_name = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
+    phone_number = serializers.CharField(required=False, allow_null=True, allow_blank=True, default=None)
     password = serializers.CharField(write_only=True)
 
     class Meta:
@@ -26,9 +26,9 @@ class RegisterUserSerializer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
-        first_name = validated_data.pop("first_name")
-        last_name = validated_data.pop("last_name")
-        phone_number = validated_data.pop("phone_number")
+        first_name = validated_data.pop("first_name", None)
+        last_name = validated_data.pop("last_name", None)
+        phone_number = validated_data.pop("phone_number", None)
 
         password = validated_data.pop("password")
         user = CentralUser(**validated_data)

@@ -36,9 +36,9 @@ class UserRegisterView(GenericAPIView):
         minutes_valid = ttl_sec // 60 or 1
 
         email = data["email"]
-        first_name = data["first_name"]
-        last_name = data["last_name"]
-        phone_number = data["phone_number"]
+        first_name = data.get("first_name")
+        last_name = data.get("last_name")
+        phone_number = data.get("phone_number")
 
         with transaction.atomic():
             user = serializer.save()

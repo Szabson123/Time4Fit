@@ -28,6 +28,7 @@ from .serializers import (
     ProductDetailSerializer,
 )
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
+from .tasks import trigger_product_popularity_increment
 
 from datetime import datetime
 
@@ -244,6 +245,8 @@ class AddProductToMealView(GenericAPIView):
             amount=amount,
             calculated_gram_weight=final_gram_weight,
         )
+
+        trigger_product_popularity_increment(product.id, points=5)
 
         item_qs = MealItem.objects.with_nutrients().filter(id=meal_item.id).first()
         output_serializer = MealItemSerializer(item_qs)

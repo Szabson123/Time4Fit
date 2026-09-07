@@ -1,4 +1,5 @@
 from decimal import Decimal
+import random
 from rest_framework import serializers
 from django.db import transaction
 from django.db.models import CharField, Q
@@ -86,14 +87,25 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         lang = 'pl'
         if request:
-            lang = request.query_params.get('lang') or getattr(request.user, 'language', 'pl') or 'pl'
-        
-        desc = obj.descriptions.filter(language=lang).first()
-        if not desc and lang != 'pl':
-            desc = obj.descriptions.filter(language='pl').first()
-        if not desc:
-            desc = obj.descriptions.first()
-        return desc.description if desc else None
+            user_profile_lang = getattr(getattr(request.user, 'profile', None), 'language', None)
+            lang = (
+                request.query_params.get('lang')
+                or user_profile_lang
+                or getattr(request.user, 'language', 'pl')
+                or 'pl'
+            )
+
+        descs = list(obj.descriptions.all())
+        if not descs:
+            return None
+
+        matching = [d for d in descs if d.language == lang]
+        if not matching and lang != 'pl':
+            matching = [d for d in descs if d.language == 'pl']
+        if not matching:
+            matching = descs
+
+        return random.choice(matching).description
 
     def get_recipes(self, obj):
         dishes = obj.dishes.all()[:10]

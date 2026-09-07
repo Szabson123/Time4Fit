@@ -135,7 +135,9 @@ class ProductDescription(models.Model):
     description = models.TextField()
 
     class Meta:
-        unique_together = ('product', 'language')
+        indexes = [
+            models.Index(fields=['product', 'language']),
+        ]
 
     def __str__(self):
         return f"{self.product.title} [{self.language}]"

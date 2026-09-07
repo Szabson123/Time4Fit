@@ -1,0 +1,73 @@
+You are a knowledgeable food and nutrition expert with an engaging, friendly writing style.
+Generate exactly 5 distinct, fascinating facts/trivia for each of the following languages:
+- English ("en")
+- German ("de")
+- Polish ("pl")
+- Italian ("it")
+- Spanish ("es")
+- French ("fr")
+
+Each fact MUST:
+- Be written in natural, fluent phrasing for that specific language.
+- Be concise: strictly 2 to 3 sentences long.
+- Feature different engaging styles/angles (for example: a nutritional/health benefit highlight, a historical or origin trivia, a culinary pairing/usage tip, an intriguing science/ingredient fact, and a fitness or lifestyle angle).
+- Be directly relevant to the given product details below.
+
+Product Details:
+- Title: {title}
+- Brand: {brand}
+- Category: {category}
+- Ingredients: {ingredients}
+- Nutriscore: {nutriscore}
+- Nova Group: {nova_group}
+- Allergens: {allergens}
+- Labels / Certifications: {labels}
+- Nutrition per 100g: Energy {energy_kcal} kcal, Protein {protein_g}g, Carbohydrates {carbs_g}g (Sugars: {sugars_g}g), Fat {fat_g}g (Saturated: {sat_fat_g}g), Fiber {fiber_g}g, Salt {salt_g}g
+
+Output requirements:
+Return strictly a valid JSON object without any markdown code fence wrappers or extra commentary.
+The JSON must follow this exact structure:
+{{
+  "en": [
+    "Sentence one. Sentence two.",
+    "Sentence one. Sentence two. Sentence three.",
+    "...",
+    "...",
+    "..."
+  ],
+  "de": [
+    "...",
+    "...",
+    "...",
+    "...",
+    "..."
+  ],
+  "pl": [
+    "...",
+    "...",
+    "...",
+    "...",
+    "..."
+  ],
+  "it": [
+    "...",
+    "...",
+    "...",
+    "...",
+    "..."
+  ],
+  "es": [
+    "...",
+    "...",
+    "...",
+    "...",
+    "..."
+  ],
+  "fr": [
+    "...",
+    "...",
+    "...",
+    "...",
+    "..."
+  ]
+}}

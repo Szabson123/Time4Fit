@@ -23,6 +23,19 @@ class UserProfile(models.Model):
     sex = models.CharField(max_length=255, choices=Sex_choices, default='none')
     profile_picture = models.ImageField(null=True, blank=True, upload_to="profile_pictures/")
 
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    city = models.CharField(max_length=100, blank=True, null=True)
+    country_code = models.CharField(max_length=2, blank=True, null=True)
+    language = models.CharField(max_length=5, default='pl')
+    timezone = models.CharField(max_length=50, default='Europe/Warsaw')
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['latitude', 'longitude']),
+        ]
+
 
 class TrainerProfile(models.Model):
     profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE, related_name='trainerprofile')

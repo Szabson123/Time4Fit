@@ -1,3 +1,6 @@
 from django.contrib import admin
+from .models import ProductDescription
 
-# Register your models here.
+
+admin.site.register(ProductDescription)
+

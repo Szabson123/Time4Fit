@@ -28,7 +28,7 @@ from .serializers import (
     ProductDetailSerializer,
 )
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
-from .tasks import trigger_product_popularity_increment
+from .tasks import trigger_product_popularity_increment, trigger_generate_product_descriptions
 
 from datetime import datetime
 
@@ -382,6 +382,8 @@ class ProductDetailView(RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         trigger_product_popularity_increment(instance.id, points=2)
+        if not instance.descriptions.all():
+            trigger_generate_product_descriptions(instance.id)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -403,6 +405,8 @@ class ProductDetailByBarcodeView(RetrieveAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         trigger_product_popularity_increment(instance.id, points=2)
+        if not instance.descriptions.all():
+            trigger_generate_product_descriptions(instance.id)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 

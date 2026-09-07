@@ -31,7 +31,10 @@ def auth_api_client(api_client, user_factory):
 
 @pytest.fixture(autouse=True)
 def use_fast_password_hasher(settings):
-    """Wymusza użycie szybkiego haszowania haseł w testach."""
+    """Wymusza użycie szybkiego haszowania haseł i eager celery w testach."""
     settings.PASSWORD_HASHERS = [
         "django.contrib.auth.hashers.MD5PasswordHasher",
-    ]
+    ]
+    settings.CELERY_TASK_ALWAYS_EAGER = True
+    settings.CELERY_TASK_EAGER_PROPAGATES = True
+

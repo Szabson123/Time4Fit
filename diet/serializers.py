@@ -1,5 +1,6 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import random
+import json
 from rest_framework import serializers
 from django.db import transaction
 from django.db.models import CharField, Q
@@ -52,6 +53,8 @@ class ProductDetailSerializer(serializers.ModelSerializer):
             'brand',
             'barcode',
             'image_url',
+            'image',
+            'ingredients_image',
             'quantity_display',
             'category',
             'category_name',
@@ -233,7 +236,8 @@ class MealItemSerializer(serializers.ModelSerializer):
         model = MealItem
         fields = [
             'id', 'name', 'amount', 'calculated_gram_weight', 'serving_unit', 
-            'total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates', 'display_salt'
+            'total_kcal', 'total_protein', 'total_fat', 'total_carbohydrates', 'display_salt',
+            'is_quick_add'
         ]
 
 
@@ -291,6 +295,132 @@ class AddProductToMealSerializer(serializers.Serializer):
     custom_weight_g = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
     custom_unit_label = serializers.CharField(max_length=100, required=False, allow_null=True, allow_blank=True)
     calculated_gram_weight = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+
+
+class QuickAddMealItemSerializer(serializers.Serializer):
+    date = serializers.DateField(required=True)
+    meal_type = serializers.IntegerField(required=True, min_value=1)
+    name = serializers.CharField(max_length=255, required=False, allow_blank=True, default='Szybkie dodanie')
+    kcal = serializers.DecimalField(max_digits=8, decimal_places=2, required=True, min_value=0)
+    protein = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=Decimal('0.00'), min_value=0)
+    carbohydrates = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=Decimal('0.00'), min_value=0)
+    fat = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=Decimal('0.00'), min_value=0)
+    salt = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=Decimal('0.00'), min_value=0)
+
+
+class ProductCreateSerializer(serializers.ModelSerializer):
+    values_per = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, default=Decimal('100.00'))
+    kcal = serializers.DecimalField(max_digits=8, decimal_places=2, required=True, min_value=0)
+    protein = serializers.DecimalField(max_digits=8, decimal_places=2, required=True, min_value=0)
+    carbohydrates = serializers.DecimalField(max_digits=8, decimal_places=2, required=True, min_value=0)
+    fat = serializers.DecimalField(max_digits=8, decimal_places=2, required=True, min_value=0)
+    salt = serializers.DecimalField(max_digits=8, decimal_places=2, required=True, min_value=0)
+
+    sugars = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    saturated_fat = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+    fiber = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, allow_null=True)
+
+    ingredients_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    traces = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    serving_units = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+
+    class Meta:
+        model = Product
+        fields = [
+            'title', 'brand', 'barcode',
+            'values_per', 'kcal', 'protein', 'carbohydrates', 'fat', 'salt',
+            'sugars', 'saturated_fat', 'fiber',
+            'package_name', 'package_whole_g', 'quantity_display',
+            'allergens', 'countries',
+            'ingredients_text', 'traces', 'serving_units',
+            'image', 'ingredients_image', 'image_url'
+        ]
+
+    def to_internal_value(self, data):
+        if hasattr(data, 'dict'):
+            data = data.dict()
+        elif hasattr(data, 'copy'):
+            data = data.copy()
+        for json_field in ['allergens', 'traces', 'countries', 'serving_units']:
+            val = data.get(json_field)
+            if isinstance(val, str):
+                try:
+                    data[json_field] = json.loads(val)
+                except (ValueError, TypeError):
+                    pass
+        return super().to_internal_value(data)
+
+    @transaction.atomic
+    def create(self, validated_data):
+        request = self.context.get('request')
+        user = request.user if request and request.user.is_authenticated else None
+
+        values_per = validated_data.pop('values_per', Decimal('100.00'))
+        if not values_per or values_per <= 0:
+            values_per = Decimal('100.00')
+
+        kcal = validated_data.pop('kcal')
+        protein = validated_data.pop('protein')
+        fat = validated_data.pop('fat')
+        carbohydrates = validated_data.pop('carbohydrates')
+        salt = validated_data.pop('salt')
+        sugars = validated_data.pop('sugars', None)
+        saturated_fat = validated_data.pop('saturated_fat', None)
+        fiber = validated_data.pop('fiber', None)
+
+        ingredients_text = validated_data.pop('ingredients_text', '') or ''
+        traces = validated_data.pop('traces', []) or []
+        serving_units_data = validated_data.pop('serving_units', []) or []
+
+        kcal_1g = (Decimal(str(kcal)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP)
+        protein_1g = (Decimal(str(protein)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP)
+        fat_1g = (Decimal(str(fat)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP)
+        carbohydrates_1g = (Decimal(str(carbohydrates)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP)
+        salt_1g = (Decimal(str(salt)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP)
+
+        sugars_1g = (Decimal(str(sugars)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP) if sugars is not None else None
+        saturated_fat_1g = (Decimal(str(saturated_fat)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP) if saturated_fat is not None else None
+        fiber_1g = (Decimal(str(fiber)) / values_per).quantize(Decimal('1.00000'), rounding=ROUND_HALF_UP) if fiber is not None else None
+
+        product = Product.objects.create(
+            user=user,
+            kcal_1g=kcal_1g,
+            protein_1g=protein_1g,
+            fat_1g=fat_1g,
+            carbohydrates_1g=carbohydrates_1g,
+            salt_1g=salt_1g,
+            sugars_1g=sugars_1g,
+            saturated_fat_1g=saturated_fat_1g,
+            fiber_1g=fiber_1g,
+            **validated_data
+        )
+
+        if product.image and not product.image_url:
+            product.image_url = product.image.url
+            product.save(update_fields=['image_url'])
+
+        ProductAdditionalInfo.objects.create(
+            product=product,
+            ingredients_text=ingredients_text,
+            traces=traces,
+            is_complete_profile=True
+        )
+
+        for su_data in serving_units_data:
+            gram_weight = su_data.get('gram_weight')
+            if gram_weight:
+                custom_label = su_data.get('custom_label') or su_data.get('label') or ''
+                unit_name = su_data.get('unit_name') or su_data.get('unit_code') or 'custom'
+                ProductServingUnit.objects.create(
+                    product=product,
+                    unit_name=unit_name,
+                    custom_label=custom_label,
+                    gram_weight=Decimal(str(gram_weight)),
+                    created_by=user,
+                    is_global=False
+                )
+
+        return product
 
 
 class CreateCustomMealSerializer(serializers.Serializer):

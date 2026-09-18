@@ -71,6 +71,8 @@ class Product(models.Model):
     quantity_display = models.CharField(max_length=100, blank=True, null=True, help_text="Oryginalny tekst z etykiety np. '350 g', '4 x 125g'",)
 
     image_url = models.URLField(max_length=500, blank=True, null=True, help_text="Link do miniatury z CDN",)
+    image = models.ImageField(upload_to='products_images/', blank=True, null=True, help_text="Zdjęcie produktu")
+    ingredients_image = models.ImageField(upload_to='ingredients_images/', blank=True, null=True, help_text="Zdjęcie składników z etykiety")
     
     category = models.ForeignKey('ProductCategory', related_name='products', on_delete=models.SET_NULL, null=True, blank=True)
     user = models.ForeignKey('user.CentralUser', on_delete=models.CASCADE, null=True, blank=True)
@@ -278,5 +280,6 @@ class MealItem(models.Model):
 
     original_product = models.ForeignKey('Product', on_delete=models.SET_NULL, null=True, blank=True)
     original_recipe = models.ForeignKey('Dish', on_delete=models.SET_NULL, null=True, blank=True)
+    is_quick_add = models.BooleanField(default=False, help_text="True jeśli dodano przez szybkie dodawanie (snapshot bez produktu)")
 
     objects = MealItemQuerySet.as_manager()

@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.generics import GenericAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.pagination import PageNumberPagination, CursorPagination
 from rest_framework.filters import SearchFilter
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
 
 import time
@@ -28,6 +29,8 @@ from .serializers import (
     ProductDetailSerializer,
     DailyWaterIntakeUpdateSerializer,
     DailyWaterIntakeResponseSerializer,
+    QuickAddMealItemSerializer,
+    ProductCreateSerializer,
 )
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit, WaterGlass
 from .tasks import trigger_product_popularity_increment, trigger_generate_product_descriptions
@@ -453,6 +456,73 @@ class CreateCustomMealView(GenericAPIView):
         return Response(out_serializer.data, status=status.HTTP_201_CREATED)
 
 
+class QuickAddMealItemView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = QuickAddMealItemSerializer
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        target_date = data['date']
+        meal_type = data['meal_type']
+        name = (data.get('name') or "").strip() or "Szybkie dodanie"
+        kcal = data['kcal']
+        protein = data.get('protein', Decimal('0.00'))
+        carbohydrates = data.get('carbohydrates', Decimal('0.00'))
+        fat = data.get('fat', Decimal('0.00'))
+        salt = data.get('salt', Decimal('0.00'))
+
+        calendar_day, _ = DailyMealCalendar.objects.get_or_create(
+            user=request.user,
+            date=target_date
+        )
+
+        if meal_type <= 5:
+            meal_category = MealCategory.objects.filter(
+                calendar=calendar_day,
+                meal_type=meal_type
+            ).first()
+            if not meal_category:
+                meal_category = MealCategory.objects.create(
+                    calendar=calendar_day,
+                    meal_type=meal_type,
+                    name=None,
+                    order=meal_type
+                )
+        else:
+            meal_category = MealCategory.objects.filter(
+                calendar=calendar_day,
+                meal_type=meal_type
+            ).first()
+            if not meal_category:
+                return Response(
+                    {"detail": f"Posiłek o numerze {meal_type} nie istnieje w wybranym dniu. Utwórz go najpierw za pomocą /diet/add-meal/."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        meal_item = MealItem.objects.create(
+            meal_category=meal_category,
+            original_product=None,
+            original_recipe=None,
+            name=name,
+            kcal_1g=kcal,
+            protein_1g=protein,
+            fat_1g=fat,
+            carbohydrates_1g=carbohydrates,
+            salt_1g=salt,
+            amount=Decimal('1.00'),
+            calculated_gram_weight=Decimal('1.00'),
+            is_quick_add=True
+        )
+
+        item_qs = MealItem.objects.with_nutrients().filter(id=meal_item.id).first()
+        output_serializer = MealItemSerializer(item_qs)
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+
 class ProductCursorPagination(CursorPagination):
     page_size = 20
     ordering = ('-popularity', '-id')
@@ -461,6 +531,7 @@ class ProductListView(ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [AllowAny]
     pagination_class = ProductCursorPagination
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def _get_servings_prefetch(self, user=None):
         filter_q = Q(is_global=True)
@@ -478,14 +549,17 @@ class ProductListView(ListAPIView):
         if raw_query:
             clean_query = raw_query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
+            user_clause = "AND (user_id IS NULL OR user_id = %s)" if (request.user and request.user.is_authenticated) else "AND user_id IS NULL"
+            params = [f'%{clean_query}%', request.user.id] if (request.user and request.user.is_authenticated) else [f'%{clean_query}%']
+
             with connection.cursor() as cursor:
                 cursor.execute(
-                    """
+                    f"""
                     SELECT id 
                     FROM diet_product 
-                    WHERE title ILIKE %s AND user_id IS NULL
+                    WHERE title ILIKE %s {user_clause}
                     """,
-                    [f'%{clean_query}%']
+                    params
                 )
                 matching_ids = [row[0] for row in cursor.fetchall()]
 
@@ -502,9 +576,13 @@ class ProductListView(ListAPIView):
             serializer = self.get_serializer(qs, many=True)
             return Response(serializer.data)
 
+        user_filter = Q(user__isnull=True)
+        if request.user and request.user.is_authenticated:
+            user_filter |= Q(user=request.user)
+
         base_qs = (
             Product.objects
-            .filter(user__isnull=True)
+            .filter(user_filter)
             .prefetch_related(self._get_servings_prefetch(request.user))
             .order_by('-popularity', '-id')
         )
@@ -516,6 +594,45 @@ class ProductListView(ListAPIView):
 
         serializer = self.get_serializer(base_qs, many=True)
         return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        if not request.user or not request.user.is_authenticated:
+            return Response({"detail": "Wymagane logowanie do utworzenia produktu."}, status=status.HTTP_401_UNAUTHORIZED)
+        serializer = ProductCreateSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        product = serializer.save()
+
+        product_qs = (
+            Product.objects
+            .filter(id=product.id)
+            .select_related('category', 'additional_info')
+            .prefetch_related('serving_units', 'descriptions', 'dishes', 'dishes__category')
+            .first()
+        )
+        out_serializer = ProductDetailSerializer(product_qs, context={'request': request})
+        return Response(out_serializer.data, status=status.HTTP_201_CREATED)
+
+
+class ProductCreateView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    serializer_class = ProductCreateSerializer
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        product = serializer.save()
+
+        product_qs = (
+            Product.objects
+            .filter(id=product.id)
+            .select_related('category', 'additional_info')
+            .prefetch_related('serving_units', 'descriptions', 'dishes', 'dishes__category')
+            .first()
+        )
+        out_serializer = ProductDetailSerializer(product_qs, context={'request': request})
+        return Response(out_serializer.data, status=status.HTTP_201_CREATED)
 
         
 class ProductDetailView(RetrieveAPIView):

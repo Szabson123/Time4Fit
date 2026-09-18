@@ -29,7 +29,7 @@ from .serializers import (
     DailyWaterIntakeUpdateSerializer,
     DailyWaterIntakeResponseSerializer,
 )
-from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
+from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit, WaterGlass
 from .tasks import trigger_product_popularity_increment, trigger_generate_product_descriptions
 
 from datetime import datetime
@@ -88,7 +88,8 @@ class DailyMealCalendarDetailView(GenericAPIView):
             total_day_carbohydrates=Coalesce(Sum(F('meals__items__carbohydrates_1g') * F('meals__items__calculated_gram_weight')), Value(0.0), output_field=DecimalField()),
             total_day_salt=Coalesce(Sum(F('meals__items__salt_1g') * F('meals__items__calculated_gram_weight')), Value(0.0), output_field=DecimalField()),
         ).prefetch_related(
-            Prefetch('meals', queryset=categories_qs)
+            Prefetch('meals', queryset=categories_qs),
+            Prefetch('water_glasses', queryset=WaterGlass.objects.order_by('created_at', 'id'))
         )
 
     def get(self, request, date_str=None):
@@ -119,6 +120,7 @@ class DailyMealCalendarDetailView(GenericAPIView):
                 "water_intake_ml": 0,
                 "standard_water_intake_ml": getattr(profile, 'standard_water_intake_ml', 250) if profile else 250,
                 "daily_water_goal_ml": getattr(profile, 'daily_water_goal_ml', 2000) if profile else 2000,
+                "water_glasses": [],
                 "meals": [get_empty_meal_slot(i) for i in range(1, 6)],
             }
             return Response(empty_data, status=status.HTTP_200_OK)
@@ -157,8 +159,9 @@ class DailyWaterIntakeView(GenericAPIView):
         except ValueError:
             return Response({"detail": "Niepoprawny format daty."}, status=status.HTTP_400_BAD_REQUEST)
 
-        calendar_day = DailyMealCalendar.objects.filter(user=request.user, date=target_date).first()
+        calendar_day = DailyMealCalendar.objects.filter(user=request.user, date=target_date).prefetch_related('water_glasses').first()
         water_intake_ml = calendar_day.water_intake_ml if calendar_day else 0
+        water_glasses = list(calendar_day.water_glasses.all()) if calendar_day else []
 
         profile = getattr(request.user, 'profile', None)
         if profile:
@@ -171,6 +174,7 @@ class DailyWaterIntakeView(GenericAPIView):
             "water_intake_ml": water_intake_ml,
             "standard_water_intake_ml": standard_water_intake_ml,
             "daily_water_goal_ml": daily_water_goal_ml,
+            "water_glasses": water_glasses,
         }
         return Response(DailyWaterIntakeResponseSerializer(data).data, status=status.HTTP_200_OK)
 
@@ -183,6 +187,7 @@ class DailyWaterIntakeView(GenericAPIView):
         target_date = data['date']
         action = data.get('action', 'add')
         amount_ml = data.get('amount_ml')
+        glass_id = data.get('glass_id')
 
         profile = getattr(request.user, 'profile', None)
         if profile:
@@ -198,12 +203,34 @@ class DailyWaterIntakeView(GenericAPIView):
         amount = amount_ml if amount_ml is not None else standard_water_intake_ml
 
         if action == 'add':
+            WaterGlass.objects.create(calendar=calendar_day, amount_ml=amount)
             calendar_day.water_intake_ml += amount
+        elif action == 'delete':
+            if glass_id:
+                glass = calendar_day.water_glasses.filter(id=glass_id).first()
+                if glass:
+                    calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - glass.amount_ml)
+                    glass.delete()
         elif action == 'subtract':
-            calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - amount)
+            if glass_id:
+                glass = calendar_day.water_glasses.filter(id=glass_id).first()
+                if glass:
+                    calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - glass.amount_ml)
+                    glass.delete()
+            else:
+                last_glass = calendar_day.water_glasses.order_by('-created_at', '-id').first()
+                if last_glass:
+                    calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - last_glass.amount_ml)
+                    last_glass.delete()
+                else:
+                    calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - amount)
         elif action == 'set':
+            calendar_day.water_glasses.all().delete()
+            if amount > 0:
+                WaterGlass.objects.create(calendar=calendar_day, amount_ml=amount)
             calendar_day.water_intake_ml = max(0, amount)
         elif action == 'reset':
+            calendar_day.water_glasses.all().delete()
             calendar_day.water_intake_ml = 0
 
         calendar_day.save()
@@ -213,6 +240,49 @@ class DailyWaterIntakeView(GenericAPIView):
             "water_intake_ml": calendar_day.water_intake_ml,
             "standard_water_intake_ml": standard_water_intake_ml,
             "daily_water_goal_ml": daily_water_goal_ml,
+            "water_glasses": calendar_day.water_glasses.all(),
+        }
+        return Response(DailyWaterIntakeResponseSerializer(response_data).data, status=status.HTTP_200_OK)
+
+    @transaction.atomic
+    def delete(self, request, *args, **kwargs):
+        glass_id = request.query_params.get('glass_id') or request.data.get('glass_id')
+        target_date_str = request.query_params.get('date') or request.data.get('date')
+        if not target_date_str:
+            return Response({"detail": "Brak wymaganego parametru daty (YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"detail": "Niepoprawny format daty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        calendar_day = DailyMealCalendar.objects.filter(user=request.user, date=target_date).first()
+        if not calendar_day:
+            return Response({"detail": "Brak wpisu dla tej daty."}, status=status.HTTP_404_NOT_FOUND)
+
+        if glass_id:
+            glass = calendar_day.water_glasses.filter(id=glass_id).first()
+            if not glass:
+                return Response({"detail": "Szklanka o podanym ID nie istnieje."}, status=status.HTTP_404_NOT_FOUND)
+            calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - glass.amount_ml)
+            glass.delete()
+        else:
+            calendar_day.water_glasses.all().delete()
+            calendar_day.water_intake_ml = 0
+
+        calendar_day.save()
+
+        profile = getattr(request.user, 'profile', None)
+        if profile:
+            profile.refresh_from_db()
+        standard_water_intake_ml = getattr(profile, 'standard_water_intake_ml', 250) if profile else 250
+        daily_water_goal_ml = getattr(profile, 'daily_water_goal_ml', 2000) if profile else 2000
+
+        response_data = {
+            "date": target_date,
+            "water_intake_ml": calendar_day.water_intake_ml,
+            "standard_water_intake_ml": standard_water_intake_ml,
+            "daily_water_goal_ml": daily_water_goal_ml,
+            "water_glasses": calendar_day.water_glasses.all(),
         }
         return Response(DailyWaterIntakeResponseSerializer(response_data).data, status=status.HTTP_200_OK)
 

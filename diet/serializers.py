@@ -6,7 +6,7 @@ from django.db.models import CharField, Q
 from django.contrib.postgres.fields import ArrayField
 
 from .models import (
-    MealItem, MealCategory, FullMeal, DailyMealCalendar,
+    MealItem, MealCategory, FullMeal, DailyMealCalendar, WaterGlass,
     ProductServingUnit, Product, ProductAdditionalInfo
 )
 
@@ -298,6 +298,12 @@ class CreateCustomMealSerializer(serializers.Serializer):
     custom_name = serializers.CharField(max_length=100, required=True)
 
 
+class WaterGlassSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WaterGlass
+        fields = ['id', 'amount_ml', 'created_at']
+
+
 class DailyMealCalendarSerializer(serializers.ModelSerializer):
     meals = MealCategorySerializer(many=True, read_only=True)
 
@@ -310,6 +316,7 @@ class DailyMealCalendarSerializer(serializers.ModelSerializer):
     water_intake_ml = serializers.IntegerField(read_only=True)
     standard_water_intake_ml = serializers.SerializerMethodField()
     daily_water_goal_ml = serializers.SerializerMethodField()
+    water_glasses = WaterGlassSerializer(many=True, read_only=True)
 
     class Meta:
         model = DailyMealCalendar
@@ -318,6 +325,7 @@ class DailyMealCalendarSerializer(serializers.ModelSerializer):
             'total_day_kcal', 'total_day_protein', 'total_day_fat', 
             'total_day_carbohydrates', 'total_day_salt', 
             'water_intake_ml', 'standard_water_intake_ml', 'daily_water_goal_ml',
+            'water_glasses',
             'meals'
         ]
 
@@ -345,8 +353,9 @@ class DailyMealCalendarSerializer(serializers.ModelSerializer):
 class DailyWaterIntakeUpdateSerializer(serializers.Serializer):
     date = serializers.DateField(required=True)
     amount_ml = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    glass_id = serializers.IntegerField(required=False, allow_null=True)
     action = serializers.ChoiceField(
-        choices=['add', 'subtract', 'set', 'reset'],
+        choices=['add', 'subtract', 'set', 'reset', 'delete'],
         default='add',
         required=False
     )
@@ -357,3 +366,4 @@ class DailyWaterIntakeResponseSerializer(serializers.Serializer):
     water_intake_ml = serializers.IntegerField()
     standard_water_intake_ml = serializers.IntegerField()
     daily_water_goal_ml = serializers.IntegerField()
+    water_glasses = WaterGlassSerializer(many=True, required=False)

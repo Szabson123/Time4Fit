@@ -220,6 +220,16 @@ class DailyMealCalendar(models.Model):
         unique_together = ('user', 'date')
 
 
+class WaterGlass(models.Model):
+    calendar = models.ForeignKey(DailyMealCalendar, on_delete=models.CASCADE, related_name='water_glasses')
+    amount_ml = models.PositiveIntegerField(help_text="Ilość w ml (np. 250)")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at', 'id']
+
+
+
 class MealCategory(models.Model):
     MEAL_TYPE_CHOICES = [
         (1, 'Śniadanie'),

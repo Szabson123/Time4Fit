@@ -31,6 +31,9 @@ class UserProfile(models.Model):
     language = models.CharField(max_length=5, default='pl')
     timezone = models.CharField(max_length=50, default='Europe/Warsaw')
 
+    standard_water_intake_ml = models.PositiveIntegerField(default=250, help_text="Standardowa porcja wody w ml (np. szklanka)")
+    daily_water_goal_ml = models.PositiveIntegerField(default=2000, help_text="Dzienny cel nawodnienia w ml")
+
     class Meta:
         indexes = [
             models.Index(fields=['latitude', 'longitude']),

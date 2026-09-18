@@ -307,11 +307,53 @@ class DailyMealCalendarSerializer(serializers.ModelSerializer):
     total_day_carbohydrates = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_day_salt = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
+    water_intake_ml = serializers.IntegerField(read_only=True)
+    standard_water_intake_ml = serializers.SerializerMethodField()
+    daily_water_goal_ml = serializers.SerializerMethodField()
+
     class Meta:
         model = DailyMealCalendar
         fields = [
             'id', 'date', 
             'total_day_kcal', 'total_day_protein', 'total_day_fat', 
             'total_day_carbohydrates', 'total_day_salt', 
+            'water_intake_ml', 'standard_water_intake_ml', 'daily_water_goal_ml',
             'meals'
         ]
+
+    def get_standard_water_intake_ml(self, obj):
+        user = getattr(obj, 'user', None)
+        if not user and 'request' in self.context:
+            user = self.context['request'].user
+        profile = getattr(user, 'profile', None)
+        if profile:
+            profile.refresh_from_db()
+            return profile.standard_water_intake_ml
+        return 250
+
+    def get_daily_water_goal_ml(self, obj):
+        user = getattr(obj, 'user', None)
+        if not user and 'request' in self.context:
+            user = self.context['request'].user
+        profile = getattr(user, 'profile', None)
+        if profile:
+            profile.refresh_from_db()
+            return profile.daily_water_goal_ml
+        return 2000
+
+
+class DailyWaterIntakeUpdateSerializer(serializers.Serializer):
+    date = serializers.DateField(required=True)
+    amount_ml = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+    action = serializers.ChoiceField(
+        choices=['add', 'subtract', 'set', 'reset'],
+        default='add',
+        required=False
+    )
+
+
+class DailyWaterIntakeResponseSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    water_intake_ml = serializers.IntegerField()
+    standard_water_intake_ml = serializers.IntegerField()
+    daily_water_goal_ml = serializers.IntegerField()

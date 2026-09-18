@@ -26,6 +26,8 @@ from .serializers import (
     MealCategorySerializer,
     ProductListSerializer,
     ProductDetailSerializer,
+    DailyWaterIntakeUpdateSerializer,
+    DailyWaterIntakeResponseSerializer,
 )
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit
 from .tasks import trigger_product_popularity_increment, trigger_generate_product_descriptions
@@ -103,6 +105,9 @@ class DailyMealCalendarDetailView(GenericAPIView):
         calendar_day = self.get_queryset().filter(date=target_date).first()
 
         if not calendar_day:
+            profile = getattr(request.user, 'profile', None)
+            if profile:
+                profile.refresh_from_db()
             empty_data = {
                 "id": None,
                 "date": target_date.strftime("%Y-%m-%d"),
@@ -111,6 +116,9 @@ class DailyMealCalendarDetailView(GenericAPIView):
                 "total_day_fat": "0.00",
                 "total_day_carbohydrates": "0.00",
                 "total_day_salt": "0.00",
+                "water_intake_ml": 0,
+                "standard_water_intake_ml": getattr(profile, 'standard_water_intake_ml', 250) if profile else 250,
+                "daily_water_goal_ml": getattr(profile, 'daily_water_goal_ml', 2000) if profile else 2000,
                 "meals": [get_empty_meal_slot(i) for i in range(1, 6)],
             }
             return Response(empty_data, status=status.HTTP_200_OK)
@@ -133,6 +141,80 @@ class DailyMealCalendarDetailView(GenericAPIView):
 
         data['meals'] = filled_meals + custom_meals
         return Response(data, status=status.HTTP_200_OK)
+
+
+class DailyWaterIntakeView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DailyWaterIntakeUpdateSerializer
+
+    def get(self, request, *args, **kwargs):
+        target_date_str = request.query_params.get('date')
+        if not target_date_str:
+            return Response({"detail": "Brak wymaganego parametru daty (YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"detail": "Niepoprawny format daty."}, status=status.HTTP_400_BAD_REQUEST)
+
+        calendar_day = DailyMealCalendar.objects.filter(user=request.user, date=target_date).first()
+        water_intake_ml = calendar_day.water_intake_ml if calendar_day else 0
+
+        profile = getattr(request.user, 'profile', None)
+        if profile:
+            profile.refresh_from_db()
+        standard_water_intake_ml = getattr(profile, 'standard_water_intake_ml', 250) if profile else 250
+        daily_water_goal_ml = getattr(profile, 'daily_water_goal_ml', 2000) if profile else 2000
+
+        data = {
+            "date": target_date,
+            "water_intake_ml": water_intake_ml,
+            "standard_water_intake_ml": standard_water_intake_ml,
+            "daily_water_goal_ml": daily_water_goal_ml,
+        }
+        return Response(DailyWaterIntakeResponseSerializer(data).data, status=status.HTTP_200_OK)
+
+    @transaction.atomic
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        target_date = data['date']
+        action = data.get('action', 'add')
+        amount_ml = data.get('amount_ml')
+
+        profile = getattr(request.user, 'profile', None)
+        if profile:
+            profile.refresh_from_db()
+        standard_water_intake_ml = getattr(profile, 'standard_water_intake_ml', 250) if profile else 250
+        daily_water_goal_ml = getattr(profile, 'daily_water_goal_ml', 2000) if profile else 2000
+
+        calendar_day, _ = DailyMealCalendar.objects.get_or_create(
+            user=request.user,
+            date=target_date
+        )
+
+        amount = amount_ml if amount_ml is not None else standard_water_intake_ml
+
+        if action == 'add':
+            calendar_day.water_intake_ml += amount
+        elif action == 'subtract':
+            calendar_day.water_intake_ml = max(0, calendar_day.water_intake_ml - amount)
+        elif action == 'set':
+            calendar_day.water_intake_ml = max(0, amount)
+        elif action == 'reset':
+            calendar_day.water_intake_ml = 0
+
+        calendar_day.save()
+
+        response_data = {
+            "date": target_date,
+            "water_intake_ml": calendar_day.water_intake_ml,
+            "standard_water_intake_ml": standard_water_intake_ml,
+            "daily_water_goal_ml": daily_water_goal_ml,
+        }
+        return Response(DailyWaterIntakeResponseSerializer(response_data).data, status=status.HTTP_200_OK)
 
 
 class AddProductToMealView(GenericAPIView):

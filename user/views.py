@@ -285,3 +285,14 @@ class UserInfoAndSettingsInfoViewSet(GenericAPIView):
         profile = get_object_or_404(qs, user=request.user)
         ser = self.get_serializer(profile)
         return Response(ser.data)
+
+    def patch(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        profile = get_object_or_404(qs, user=request.user)
+        ser = self.get_serializer(profile, data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        ser.save()
+        return Response(ser.data, status=status.HTTP_200_OK)
+
+    def put(self, request, *args, **kwargs):
+        return self.patch(request, *args, **kwargs)

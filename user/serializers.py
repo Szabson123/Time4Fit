@@ -109,5 +109,9 @@ class UserInfoAndSettingsInfoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['name', 'surname', 'sex', 'birth_day', 'profile_picture', 'phone_number', 'is_trainer', 'trainer_id']
+        fields = [
+            'name', 'surname', 'sex', 'birth_day', 'profile_picture', 'phone_number',
+            'standard_water_intake_ml', 'daily_water_goal_ml',
+            'is_trainer', 'trainer_id'
+        ]
         

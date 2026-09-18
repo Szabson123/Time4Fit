@@ -214,6 +214,7 @@ class DishIngredient(models.Model):
 class DailyMealCalendar(models.Model):
     user = models.ForeignKey(CentralUser, on_delete=models.CASCADE)
     date = models.DateField()
+    water_intake_ml = models.PositiveIntegerField(default=0, help_text="Ilość wypitej wody w ml dla danego dnia")
 
     class Meta:
         unique_together = ('user', 'date')

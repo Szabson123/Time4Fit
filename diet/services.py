@@ -105,3 +105,92 @@ def get_daily_meal_plan(user, target_date):
         "calendar": calendar_day,
         "totals": day_totals
     }
+
+
+class MacroCalculatorService:
+    # PAL multipliers
+    ACTIVITY_MULTIPLIERS = {
+        'sedentary': Decimal('1.20'),
+        'lightly_active': Decimal('1.375'),
+        'moderately_active': Decimal('1.55'),
+        'very_active': Decimal('1.725'),
+    }
+
+    # Goal adjustment percentage
+    GOAL_ADJUSTMENTS = {
+        'maintenance': Decimal('1.00'),       # 0%
+        'reduction': Decimal('0.85'),         # -15%
+        'muscle_gain': Decimal('1.10'),       # +10%
+    }
+
+    # Protein per kg body weight depending on goal
+    PROTEIN_PER_KG = {
+        'maintenance': Decimal('1.60'),
+        'reduction': Decimal('2.00'),
+        'muscle_gain': Decimal('1.80'),
+    }
+
+    @classmethod
+    def calculate_bmr(cls, gender: str, weight_kg: Decimal, height_cm: Decimal, age: int, body_fat_percentage: Decimal = None) -> Decimal:
+        weight_kg = Decimal(str(weight_kg))
+        height_cm = Decimal(str(height_cm))
+        age = Decimal(str(age))
+
+        if body_fat_percentage is not None and body_fat_percentage > 0:
+            # Katch-McArdle formula based on Lean Body Mass (LBM)
+            bf = Decimal(str(body_fat_percentage))
+            lbm = weight_kg * (Decimal('1.00') - (bf / Decimal('100.00')))
+            bmr = Decimal('370.00') + (Decimal('21.60') * lbm)
+        else:
+            # Mifflin-St Jeor formula
+            if gender == 'male':
+                bmr = (Decimal('10.00') * weight_kg) + (Decimal('6.25') * height_cm) - (Decimal('5.00') * age) + Decimal('5.00')
+            else:
+                bmr = (Decimal('10.00') * weight_kg) + (Decimal('6.25') * height_cm) - (Decimal('5.00') * age) - Decimal('161.00')
+
+        return bmr.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    @classmethod
+    def calculate_tdee(cls, bmr: Decimal, activity_level: str) -> Decimal:
+        multiplier = cls.ACTIVITY_MULTIPLIERS.get(activity_level, Decimal('1.20'))
+        tdee = bmr * multiplier
+        return tdee.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+    @classmethod
+    def calculate_target_macros(cls, tdee: Decimal, goal: str, weight_kg: Decimal) -> dict:
+        weight_kg = Decimal(str(weight_kg))
+        goal_mult = cls.GOAL_ADJUSTMENTS.get(goal, Decimal('1.00'))
+        target_calories = (tdee * goal_mult).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        # Protein: based on goal & weight in kg
+        protein_factor = cls.PROTEIN_PER_KG.get(goal, Decimal('1.80'))
+        target_protein_g = (weight_kg * protein_factor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        protein_kcal = target_protein_g * Decimal('4.00')
+
+        # Fat: 25% of target calories
+        fat_kcal = target_calories * Decimal('0.25')
+        target_fat_g = (fat_kcal / Decimal('9.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        # Carbohydrates: remaining calories
+        carb_kcal = target_calories - protein_kcal - (target_fat_g * Decimal('9.00'))
+        if carb_kcal < Decimal('0.00'):
+            carb_kcal = Decimal('0.00')
+        target_carbohydrates_g = (carb_kcal / Decimal('4.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+        return {
+            "target_calories": target_calories,
+            "target_protein_g": target_protein_g,
+            "target_fat_g": target_fat_g,
+            "target_carbohydrates_g": target_carbohydrates_g,
+        }
+
+    @classmethod
+    def calculate_all(cls, gender: str, age: int, weight_kg: Decimal, height_cm: Decimal, activity_level: str, goal: str, body_fat_percentage: Decimal = None) -> dict:
+        bmr = cls.calculate_bmr(gender, weight_kg, height_cm, age, body_fat_percentage)
+        tdee = cls.calculate_tdee(bmr, activity_level)
+        macros = cls.calculate_target_macros(tdee, goal, weight_kg)
+        return {
+            "bmr": bmr,
+            "tdee": tdee,
+            **macros,
+        }

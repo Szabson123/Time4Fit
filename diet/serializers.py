@@ -10,6 +10,8 @@ from .models import (
     MealItem, MealCategory, FullMeal, DailyMealCalendar, WaterGlass,
     ProductServingUnit, Product, ProductAdditionalInfo
 )
+from user_profile.models import UserMacroProfile
+from .services import MacroCalculatorService
 
 
 class ProductAdditionalInfoSerializer(serializers.ModelSerializer):
@@ -496,4 +498,93 @@ class DailyWaterIntakeResponseSerializer(serializers.Serializer):
     water_intake_ml = serializers.IntegerField()
     standard_water_intake_ml = serializers.IntegerField()
     daily_water_goal_ml = serializers.IntegerField()
-    water_glasses = WaterGlassSerializer(many=True, required=False)
+    water_glasses = WaterGlassSerializer(many=True, required=False)
+
+
+class UserDailyMacrosSerializer(serializers.ModelSerializer):
+    bmr = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
+    tdee = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
+    target_calories = serializers.DecimalField(max_digits=7, decimal_places=2, read_only=True)
+    target_protein_g = serializers.DecimalField(max_digits=6, decimal_places=2, read_only=True)
+    target_fat_g = serializers.DecimalField(max_digits=6, decimal_places=2, read_only=True)
+    target_carbohydrates_g = serializers.DecimalField(max_digits=6, decimal_places=2, read_only=True)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = UserMacroProfile
+        fields = [
+            'id',
+            'gender',
+            'age',
+            'weight_kg',
+            'height_cm',
+            'body_fat_percentage',
+            'activity_level',
+            'goal',
+            'bmr',
+            'tdee',
+            'target_calories',
+            'target_protein_g',
+            'target_fat_g',
+            'target_carbohydrates_g',
+            'created_at',
+            'updated_at',
+        ]
+
+    def validate_age(self, value):
+        if value < 10 or value > 120:
+            raise serializers.ValidationError("Wiek musi być w przedziale 10-120 lat.")
+        return value
+
+    def validate_weight_kg(self, value):
+        if value <= 0 or value > 500:
+            raise serializers.ValidationError("Masa ciała musi być dodatnia i mniejsza niż 500 kg.")
+        return value
+
+    def validate_height_cm(self, value):
+        if value <= 0 or value > 300:
+            raise serializers.ValidationError("Wzrost musi być dodatni i mniejszy niż 300 cm.")
+        return value
+
+    def validate_body_fat_percentage(self, value):
+        if value is not None and (value <= 0 or value >= 70):
+            raise serializers.ValidationError("Poziom tkanki tłuszczowej musi być w przedziale 1-70%.")
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        calculated = MacroCalculatorService.calculate_all(
+            gender=validated_data['gender'],
+            age=validated_data['age'],
+            weight_kg=validated_data['weight_kg'],
+            height_cm=validated_data['height_cm'],
+            activity_level=validated_data['activity_level'],
+            goal=validated_data['goal'],
+            body_fat_percentage=validated_data.get('body_fat_percentage'),
+        )
+        validated_data.update(calculated)
+        instance, _ = UserMacroProfile.objects.update_or_create(
+            user=user,
+            defaults=validated_data
+        )
+        return instance
+
+    def update(self, instance, validated_data):
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        calculated = MacroCalculatorService.calculate_all(
+            gender=instance.gender,
+            age=instance.age,
+            weight_kg=instance.weight_kg,
+            height_cm=instance.height_cm,
+            activity_level=instance.activity_level,
+            goal=instance.goal,
+            body_fat_percentage=instance.body_fat_percentage,
+        )
+        for attr, value in calculated.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance

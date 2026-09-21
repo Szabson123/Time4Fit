@@ -31,8 +31,10 @@ from .serializers import (
     DailyWaterIntakeResponseSerializer,
     QuickAddMealItemSerializer,
     ProductCreateSerializer,
+    UserDailyMacrosSerializer,
 )
 from .models import DailyMealCalendar, MealCategory, FullMeal, MealItem, Product, ProductServingUnit, WaterGlass
+from user_profile.models import UserMacroProfile
 from .tasks import trigger_product_popularity_increment, trigger_generate_product_descriptions
 
 from datetime import datetime
@@ -678,4 +680,57 @@ class ProductDetailByBarcodeView(RetrieveAPIView):
             trigger_generate_product_descriptions(instance.id)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
+
+
+class DailyUserMacrosView(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserDailyMacrosSerializer
+
+    def get_object(self):
+        try:
+            return UserMacroProfile.objects.get(user=self.request.user)
+        except UserMacroProfile.DoesNotExist:
+            return None
+
+    def get(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not instance:
+            return Response(
+                {"detail": "Profil makroskładników nie został jeszcze skonfigurowany.", "configured": False},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance:
+            serializer = self.get_serializer(instance, data=request.data)
+            created = False
+        else:
+            serializer = self.get_serializer(data=request.data)
+            created = True
+
+        serializer.is_valid(raise_exception=True)
+        profile = serializer.save()
+        out_serializer = self.get_serializer(profile)
+        return Response(
+            out_serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
+
+    def put(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
+
+    def patch(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not instance:
+            return Response(
+                {"detail": "Profil makroskładników nie został jeszcze skonfigurowany. Użyj metody POST.", "configured": False},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        profile = serializer.save()
+        return Response(self.get_serializer(profile).data, status=status.HTTP_200_OK)
 

@@ -39,6 +39,10 @@ class UserProfile(models.Model):
             models.Index(fields=['latitude', 'longitude']),
         ]
 
+    @property
+    def macro_profile(self):
+        return getattr(self.user, 'macro_profile', None)
+
 
 class TrainerProfile(models.Model):
     profile = models.OneToOneField(UserProfile, on_delete=models.CASCADE, related_name='trainerprofile')
@@ -104,3 +108,48 @@ class TrainerImages(models.Model):
     collection = models.ForeignKey(PhotosCollection, on_delete=models.CASCADE, related_name='images')
     img = models.ImageField(upload_to='trainer_collection_photos/')
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class UserMacroProfile(models.Model):
+    GENDER_CHOICES = [
+        ('male', 'Mężczyzna'),
+        ('female', 'Kobieta'),
+    ]
+
+    ACTIVITY_LEVEL_CHOICES = [
+        ('sedentary', 'Siedząca'),
+        ('lightly_active', 'Lekko aktywna'),
+        ('moderately_active', 'Umiarkowanie aktywny'),
+        ('very_active', 'Bardzo aktywny'),
+    ]
+
+    GOAL_CHOICES = [
+        ('maintenance', 'Utrzymanie wagi'),
+        ('reduction', 'Redukcja'),
+        ('muscle_gain', 'Budowa mięśni'),
+    ]
+
+    user = models.OneToOneField(CentralUser, on_delete=models.CASCADE, related_name="macro_profile")
+
+    # Survey questions / input data
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
+    age = models.PositiveIntegerField()
+    weight_kg = models.DecimalField(max_digits=5, decimal_places=2)
+    height_cm = models.DecimalField(max_digits=5, decimal_places=2)
+    body_fat_percentage = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
+    activity_level = models.CharField(max_length=20, choices=ACTIVITY_LEVEL_CHOICES)
+    goal = models.CharField(max_length=20, choices=GOAL_CHOICES)
+
+    # Calculated target values
+    bmr = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    tdee = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    target_calories = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    target_protein_g = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    target_fat_g = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    target_carbohydrates_g = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"MacroProfile ({self.user.email}) - {self.target_calories} kcal"

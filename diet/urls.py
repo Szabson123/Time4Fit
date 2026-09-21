@@ -10,11 +10,14 @@ from .views import (
     ProductDetailByBarcodeView,
     DailyWaterIntakeView,
     QuickAddMealItemView,
+    DailyUserMacrosView,
 )
 
 
 urlpatterns = [
     path('daily-meals/', DailyMealCalendarDetailView.as_view(), name='daily-meals'),
+    path('daily-user-macros/', DailyUserMacrosView.as_view(), name='daily-user-macros'),
+    path('dayly-user-macros/', DailyUserMacrosView.as_view(), name='dayly-user-macros'),
     path('add-product/', AddProductToMealView.as_view(), name='add-product-to-meal'),
     path('quick-add/', QuickAddMealItemView.as_view(), name='quick-add-meal-item'),
     path('add-meal/', CreateCustomMealView.as_view(), name='add-custom-meal'),
